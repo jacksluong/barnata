@@ -1,0 +1,143 @@
+import BarnataCore
+import XCTest
+
+@testable import BarnataDaemonKit
+
+final class RequestValidatorTests: XCTestCase {
+    private let goodPath = "/Users/test/.config/kanata/canary.kbd"
+
+    private func validator(_ files: [String: FileFacts]) -> RequestValidator {
+        RequestValidator(inspector: FakeFileInspector(files: files))
+    }
+
+    private func request(configPaths: [String]? = nil, tcpPort: Int = 5829, extraArgs: [String] = []) -> StartRequest {
+        StartRequest(
+            presetName: "Default",
+            configPaths: configPaths ?? [goodPath],
+            tcpPort: tcpPort,
+            extraArgs: extraArgs
+        )
+    }
+
+    private func assertRejected(
+        _ request: StartRequest,
+        files: [String: FileFacts],
+        rule: String,
+        detailContains: String,
+        line: UInt = #line
+    ) {
+        XCTAssertThrowsError(try validator(files).validate(request, ownerUID: callerUID), file: #filePath, line: line) { error in
+            guard let error = error as? ValidationError else {
+                return XCTFail("expected a ValidationError, got \(error)", file: #filePath, line: line)
+            }
+            XCTAssertEqual(error.rule, rule, file: #filePath, line: line)
+            XCTAssertTrue(error.detail.contains(detailContains), error.detail, file: #filePath, line: line)
+        }
+    }
+
+    func testAValidRequestIsAccepted() throws {
+        let validated = try validator([goodPath: .regularFile()]).validate(request(), ownerUID: callerUID)
+        XCTAssertEqual(validated.ownerUID, callerUID)
+        XCTAssertEqual(validated.arguments, ["-c", goodPath, "-p", "127.0.0.1:5829", "--no-wait"])
+    }
+
+    func testExtraArgumentsFollowTheDaemonsOwnArguments() throws {
+        let validated = try validator([goodPath: .regularFile()])
+            .validate(request(extraArgs: ["--debug"]), ownerUID: callerUID)
+        XCTAssertEqual(validated.arguments, ["-c", goodPath, "-p", "127.0.0.1:5829", "--no-wait", "--debug"])
+    }
+
+    func testEveryConfigPathBecomesItsOwnFlag() throws {
+        let second = "/Users/test/.config/kanata/other.kbd"
+        let validated = try validator([goodPath: .regularFile(), second: .regularFile()])
+            .validate(request(configPaths: [goodPath, second]), ownerUID: callerUID)
+        XCTAssertEqual(validated.arguments.prefix(4), ["-c", goodPath, "-c", second])
+    }
+
+    func testRelativePathIsRejected() {
+        assertRejected(
+            request(configPaths: ["canary.kbd"]),
+            files: ["canary.kbd": .regularFile()],
+            rule: "config path must be absolute",
+            detailContains: "canary.kbd is relative"
+        )
+    }
+
+    func testNonexistentFileIsRejected() {
+        assertRejected(
+            request(),
+            files: [:],
+            rule: "config path must exist",
+            detailContains: "does not exist"
+        )
+    }
+
+    func testDirectoryIsRejected() {
+        assertRejected(
+            request(configPaths: ["/Users/test/.config/kanata"]),
+            files: ["/Users/test/.config/kanata": .directory()],
+            rule: "config path must be a regular file",
+            detailContains: "is not a regular file"
+        )
+    }
+
+    /// stat follows symlinks, so a link to a directory looks like a directory here
+    func testSymlinkToADirectoryIsRejected() {
+        assertRejected(
+            request(configPaths: ["/Users/test/link-to-configs"]),
+            files: ["/Users/test/link-to-configs": .directory()],
+            rule: "config path must be a regular file",
+            detailContains: "is not a regular file"
+        )
+    }
+
+    func testFileOwnedByAnotherUserWithoutWorldReadIsRejected() {
+        assertRejected(
+            request(),
+            files: [goodPath: .regularFile(ownedBy: otherUID, worldReadable: false)],
+            rule: "config file must be owned by the caller or world-readable",
+            detailContains: "owned by uid 502"
+        )
+    }
+
+    func testFileOwnedByAnotherUserIsAcceptedWhenWorldReadable() throws {
+        let files = [goodPath: FileFacts.regularFile(ownedBy: otherUID, worldReadable: true)]
+        XCTAssertNoThrow(try validator(files).validate(request(), ownerUID: callerUID))
+    }
+
+    func testPortBelowTheRangeIsRejected() {
+        assertRejected(
+            request(tcpPort: 80),
+            files: [goodPath: .regularFile()],
+            rule: "tcp port out of range",
+            detailContains: "80 is outside 1024...65535"
+        )
+    }
+
+    func testPortAboveTheRangeIsRejected() {
+        assertRejected(
+            request(tcpPort: 70000),
+            files: [goodPath: .regularFile()],
+            rule: "tcp port out of range",
+            detailContains: "70000 is outside 1024...65535"
+        )
+    }
+
+    func testDisallowedFlagIsRejected() {
+        assertRejected(
+            request(extraArgs: ["--cfg", "/etc/passwd"]),
+            files: [goodPath: .regularFile()],
+            rule: "extra argument not allowed",
+            detailContains: "--cfg is not an allowed kanata flag"
+        )
+    }
+
+    func testEmptyConfigListIsRejected() {
+        assertRejected(
+            request(configPaths: []),
+            files: [:],
+            rule: "config path",
+            detailContains: "at least one config file"
+        )
+    }
+}

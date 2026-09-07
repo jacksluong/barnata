@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "BarnataCore", targets: ["BarnataCore"]),
+        .library(name: "BarnataDaemonKit", targets: ["BarnataDaemonKit"]),
         .executable(name: "Barnata", targets: ["Barnata"]),
         .executable(name: "barnata-daemon", targets: ["barnata-daemon"]),
     ],
@@ -18,7 +19,9 @@ let package = Package(
             dependencies: [.product(name: "TOMLKit", package: "TOMLKit")]
         ),
         .executableTarget(name: "Barnata", dependencies: ["BarnataCore"]),
-        .executableTarget(name: "barnata-daemon", dependencies: ["BarnataCore"]),
+        .target(name: "BarnataDaemonKit", dependencies: ["BarnataCore"]),
+        .executableTarget(name: "barnata-daemon", dependencies: ["BarnataDaemonKit"]),
         .testTarget(name: "BarnataCoreTests", dependencies: ["BarnataCore"]),
+        .testTarget(name: "BarnataDaemonKitTests", dependencies: ["BarnataDaemonKit"]),
     ]
 )

@@ -63,6 +63,7 @@ public struct DaemonStatus: Codable, Sendable, Equatable {
     public var presetName: String?
     public var configPaths: [String]
     public var tcpPort: Int?
+    public var ownerUID: uid_t?
     public var lastExitCode: Int32?
     public var lastError: String?
     public var restartCount: Int
@@ -76,6 +77,7 @@ public struct DaemonStatus: Codable, Sendable, Equatable {
         presetName: String? = nil,
         configPaths: [String] = [],
         tcpPort: Int? = nil,
+        ownerUID: uid_t? = nil,
         lastExitCode: Int32? = nil,
         lastError: String? = nil,
         restartCount: Int = 0,
@@ -88,6 +90,7 @@ public struct DaemonStatus: Codable, Sendable, Equatable {
         self.presetName = presetName
         self.configPaths = configPaths
         self.tcpPort = tcpPort
+        self.ownerUID = ownerUID
         self.lastExitCode = lastExitCode
         self.lastError = lastError
         self.restartCount = restartCount
