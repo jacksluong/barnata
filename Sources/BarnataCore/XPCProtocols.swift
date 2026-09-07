@@ -15,8 +15,9 @@ public func barnataCodeSigningRequirement(teamID: String, identifier: String) ->
     func start(request: Data, reply: @escaping (Data) -> Void)
     func stop(reply: @escaping (Data) -> Void)
     func restart(reply: @escaping (Data) -> Void)
-    func checkConfig(request: Data, reply: @escaping (Data) -> Void)
+    func shutdown(reply: @escaping (Data) -> Void)
     func ensureVirtualHIDDaemon(reply: @escaping (Data) -> Void)
+    func installDriver(reply: @escaping (Data) -> Void)
     func activateDriver(reply: @escaping (Data) -> Void)
     func subscribe(client: NSXPCListenerEndpoint)
 }

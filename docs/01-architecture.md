@@ -9,12 +9,13 @@ Barnata.app/
     MacOS/
       Barnata                      menu bar app, runs as the user
       barnata-daemon               root daemon, registered via SMAppService
-      kanata                         upstream release binary, re-signed
+      kanata                         upstream arm64 release binary, re-signed
     Library/LaunchDaemons/
       io.jackyluong.barnata.daemon.plist
     Resources/
       status-icons/                  default, crashed, paused, reloading (template PNGs)
-      driver-requirements.json       required Karabiner driver version and pkg URL
+      Karabiner-DriverKit-VirtualHIDDevice-<DRIVER_VERSION>.pkg
+      driver-requirements.json       required driver pkg version and pkg file name
 ```
 
 Three processes:
@@ -22,7 +23,7 @@ Three processes:
 | Process | User | Lifetime | Job |
 |---|---|---|---|
 | `Barnata` | you | while the menu bar item is shown | menu, icons, config file, TCP client to kanata, XPC client to daemon |
-| `barnata-daemon` | root | launched on demand by launchd, exits when idle | spawns and supervises kanata and, when needed, the Karabiner virtual HID daemon |
+| `barnata-daemon` | root | launched on demand by launchd, exits when idle | spawns and supervises kanata and, when needed, the Karabiner virtual HID daemon; installs the driver pkg |
 | `kanata` | root | child of the daemon | key remapping, TCP server on localhost |
 
 ## Privilege boundary
@@ -31,12 +32,13 @@ The daemon is the only code that runs as root and is written by this project. Ru
 
 - The kanata executable is always `<own bundle>/Contents/MacOS/kanata`. The path is derived from the daemon's own executable path, never from the request.
 - Before every spawn, the daemon validates the kanata binary with `SecStaticCodeCheckValidity` against the designated requirement `anchor apple generic and certificate leaf[subject.OU] = "<TEAMID>" and identifier "io.jackyluong.barnata.kanata"`. A failed check refuses to start.
-- Arguments are built by the daemon from a typed request. Config paths must be absolute, must resolve to regular files, and are passed as separate `-c` values. The TCP listen address is always `127.0.0.1:<port>` with port in 1024...65535. Extra flags are accepted only from this allowlist: `-n`/`--nodelay`, `-d`/`--debug`, `-t`/`--trace`, `-q`/`--quiet`, `--log-layer-changes`, `--release-grab-on-lock`, `--emergency-exit-code <int>`.
+- Arguments are built by the daemon from a typed request. Config paths must be absolute, must resolve to regular files, and are passed as separate `-c` values. Each config file must be owned by the calling connection's uid (`NSXPCConnection.effectiveUserIdentifier`) or carry the world-readable bit; checked with `stat`. The TCP listen address is always `127.0.0.1:<port>` with port in 1024...65535. Extra flags are accepted only from this allowlist: `-n`/`--nodelay`, `-d`/`--debug`, `-t`/`--trace`, `-q`/`--quiet`, `--log-layer-changes`, `--release-grab-on-lock`, `--emergency-exit-code <int>`.
 - The environment passed to kanata is fixed: `PATH=/usr/bin:/bin`, `HOME=/var/root`. Nothing from the client.
 - No hooks, no shell, no environment, no executable path, no working directory are accepted over XPC.
 - XPC connections are accepted only when they satisfy the code signing requirement `anchor apple generic and certificate leaf[subject.OU] = "<TEAMID>" and identifier "io.jackyluong.barnata"`, set with `NSXPCConnection.setCodeSigningRequirement(_:)`.
-- Files the daemon writes are under `/Library/Application Support/Barnata/` (mode 0755, root:wheel) and `/Library/Logs/Barnata/` (dir 0755, log files 0644).
+- The only files the daemon writes are under `/Library/Logs/Barnata/` (dir 0755, log files 0644, root:wheel).
 - The daemon never writes to `/etc`, never modifies launchd jobs other than its own children, and never touches the user's home directory.
+- The only third-party binaries the daemon executes are the Karabiner daemon, manager, and pkg, each validated against `anchor apple generic and certificate leaf[subject.OU] = "G43BCU2T37"` first.
 
 kanata itself reads a user-owned config file as root. With a `cmd`-less kanata build, a config file can only remap keys.
 
@@ -72,7 +74,7 @@ kanata itself reads a user-owned config file as root. With a `cmd`-less kanata b
 </plist>
 ```
 
-launchd starts the daemon the first time a client connects to the Mach service. The daemon exits after 60 seconds with no running child and no connected clients. launchd starts it again on the next connection. Nothing starts kanata at boot on its own; the app starts it at login through the `autorun` preset.
+launchd starts the daemon the first time a client connects to the Mach service. The daemon exits after 60 seconds with no running kanata and no connected clients. The virtual HID daemon child does not count toward idle and is stopped on idle exit. launchd starts the daemon again on the next connection. Nothing starts kanata at boot on its own; the app starts it at login through the `autorun` preset.
 
 Registration from the app:
 
@@ -86,13 +88,22 @@ case .notRegistered, .notFound: // show error in menu
 }
 ```
 
-Approval happens once in System Settings > General > Login Items & Extensions with an admin credential prompt. The app re-checks `status` every time the menu opens and on app launch.
+Approval happens once in System Settings > General > Login Items & Extensions with an admin credential prompt. The app re-checks `status` every time the menu opens and on app launch. The app never calls `unregister()` except from the deferred `--uninstall` command.
 
-When the app's bundle version differs from the daemon's reported version, the app calls `unregister()` then `register()`.
+## Update flow
+
+On launch the app compares its `CFBundleVersion` with the daemon's `version()` reply. On mismatch:
+
+1. Remember the daemon's current `presetName` if state is `running`.
+2. Call `stop`, then `shutdown`. The daemon terminates its children and exits.
+3. Reconnect with the usual backoff. launchd spawns the new binary from the updated bundle.
+4. Start the remembered preset, or the `autorun` preset if none was running.
+
+Kanata is also restarted when `DaemonStatus.kanataVersion` differs from the app's bundled kanata version string.
 
 ## XPC protocol
 
-Mach service `io.jackyluong.barnata.daemon`. Interface in the shared `BarnataCore` module, all payload types `Codable` and `NSSecureCoding` via a `Data`-wrapped JSON envelope.
+Mach service `io.jackyluong.barnata.daemon`. Interface in the shared `BarnataCore` module, all payload types `Codable` via a `Data`-wrapped JSON envelope.
 
 ```swift
 @objc protocol BarnataDaemonProtocol {
@@ -101,8 +112,9 @@ Mach service `io.jackyluong.barnata.daemon`. Interface in the shared `BarnataCor
   func start(request: Data, reply: @escaping (Data) -> Void)       // StartRequest -> CommandResult
   func stop(reply: @escaping (Data) -> Void)                       // CommandResult
   func restart(reply: @escaping (Data) -> Void)                    // CommandResult, same request as last start
-  func checkConfig(request: Data, reply: @escaping (Data) -> Void) // runs kanata --check, returns CommandResult with stderr
+  func shutdown(reply: @escaping (Data) -> Void)                   // CommandResult, then the daemon exits
   func ensureVirtualHIDDaemon(reply: @escaping (Data) -> Void)     // CommandResult
+  func installDriver(reply: @escaping (Data) -> Void)              // CommandResult
   func activateDriver(reply: @escaping (Data) -> Void)             // CommandResult
   func subscribe(client: NSXPCListenerEndpoint)                    // push status changes to the app
 }
@@ -129,8 +141,9 @@ struct DaemonStatus: Codable {
   var presetName: String?
   var configPaths: [String]
   var tcpPort: Int?
+  var ownerUID: uid_t?             // uid of the connection that sent the last start
   var lastExitCode: Int32?
-  var lastError: String?
+  var lastError: String?           // last 20 lines of kanata stderr after a non-zero exit
   var restartCount: Int
   var driver: DriverStatus
 }
@@ -155,7 +168,7 @@ Subscription: the app hands the daemon an anonymous listener endpoint. The daemo
 
 ## Process supervision in the daemon
 
-- Spawn with `posix_spawn`, stdout and stderr redirected to `/Library/Logs/Barnata/kanata.log` (rotated at 5 MB, keep 3).
+- Spawn with `posix_spawn`, stdout and stderr redirected to `/Library/Logs/Barnata/kanata.log` (rotated at 5 MB, keep 3). The supervisor also keeps the last 20 lines of stderr in memory for `lastError`.
 - Disclaim TCC responsibility for the child:
 
   ```swift
@@ -165,25 +178,31 @@ Subscription: the app hands the daemon an anonymous listener endpoint. The daemo
   ```
 
   Fallback if the symbol is missing or returns non-zero: spawn without it and report `responsibilityDisclaimed = false` in the log. In that case both the daemon and kanata need Input Monitoring and Accessibility grants.
-- `stop` sends SIGTERM, waits 3 s, then SIGKILL.
-- Crash handling: exit within 60 s of start or a non-zero exit sets state `crashed`. With `autorestartOnCrash`, restart with backoff (1 s, 2 s, 4 s, 8 s, cap 30 s) and give up after 5 restarts inside 2 minutes.
-- kanata emergency exit (LCtrl+Space+Esc) exits with code 0. State becomes `idle`, no restart.
+- `stop` sends SIGTERM, waits 3 s, then SIGKILL. `stop` also stops the Barnata-managed virtual HID daemon.
+- State after exit is decided by the exit code: non-zero sets `crashed`, zero sets `idle`. kanata emergency exit (LCtrl+Space+Esc) exits with code 0.
+- With `autorestartOnCrash`, a `crashed` exit restarts with backoff (1 s, 2 s, 4 s, 8 s, cap 30 s). The daemon gives up after 5 restarts inside 2 minutes and stays `crashed`.
 - On daemon exit for any reason, all children get SIGTERM.
 - Single instance: `start` while running stops the current kanata first.
+- The `ProcessSupervisor` takes a `Spawner` protocol so the backoff policy is testable without spawning.
 
-## Karabiner virtual HID daemon
+## Karabiner virtual HID driver
 
-kanata needs the `Karabiner-DriverKit-VirtualHIDDevice` system extension activated and the `Karabiner-VirtualHIDDevice-Daemon` process running as root.
+kanata needs the `Karabiner-DriverKit-VirtualHIDDevice` system extension activated and the `Karabiner-VirtualHIDDevice-Daemon` process running as root. The signed pkg from pqrs is bundled at `Contents/Resources/Karabiner-DriverKit-VirtualHIDDevice-<DRIVER_VERSION>.pkg`.
 
 `status` reports the driver state. `start` calls `ensureVirtualHIDDaemon` first:
 
 1. If a process whose executable path is `/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon` is already running (Karabiner-Elements or another manager owns it), do nothing.
-2. Otherwise validate that binary against `anchor apple generic and certificate leaf[subject.OU] = "G43BCU2T37"` and spawn it as a supervised child with the same crash policy as kanata. It stays up as long as the daemon stays up.
-3. If the binary is missing, return a `CommandResult` with `ok = false` and a message pointing at the pkg URL from `driver-requirements.json`.
+2. Otherwise validate that binary against the pqrs requirement and spawn it as a supervised child with the same crash policy as kanata. It stops together with kanata.
+3. If the binary is missing, return `ok = false` with a message telling the app to offer "Install driver…".
 
-`activateDriver` runs `/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager activate` after the same signature check, then returns. The user still approves the extension in System Settings > General > Login Items & Extensions > Driver Extensions.
+`installDriver`:
 
-Installing the pkg itself is out of scope for the daemon. The app's "Install driver" menu item opens the pkg download URL.
+1. Refuse when an installed driver version is newer than `requiredVersion`. The message names both versions.
+2. Verify the bundled pkg with `pkgutil --check-signature`, requiring a Developer ID Installer certificate for team `G43BCU2T37`.
+3. Run `/usr/sbin/installer -pkg <bundled pkg> -target /`.
+4. Run `activateDriver`.
+
+`activateDriver` runs `/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager activate` after the signature check. The app then opens System Settings > General > Login Items & Extensions > Driver Extensions for the user's approval.
 
 ## kanata TCP client in the app
 
@@ -204,7 +223,9 @@ Handled server messages: `HelloOk`, `LayerChange`, `LayerNames`, `CurrentLayerNa
 
 ## Menu
 
-Status item icon reflects, in priority order: daemon not approved, driver missing, kanata crashed, reloading (2 s flash), current layer icon, default icon.
+Status item icon reflects, in priority order: daemon not approved, driver missing, kanata crashed, `paused` while idle, reloading (2 s flash), current layer icon, default icon.
+
+While state is `starting` or `stopping` for longer than 400 ms, the status item shows an `NSProgressIndicator` with `style = .spinning` in place of the icon. Shorter transitions keep the previous icon.
 
 ```
 Barnata: Running (canary.kbd, layer: base)     disabled title line
@@ -222,25 +243,29 @@ Open kanata log
 Open Barnata log                                Console.app filtered to the subsystem
 Setup                                             submenu
   Approve background daemon…                      shown until daemon.status == .enabled
-  Install Karabiner driver…                       shown when driver not installed
-  Activate Karabiner driver                       shown when installed but not activated
+  Install Karabiner driver…                       shown when driver not installed; install, activate, open the approval pane
+  Activate Karabiner driver…                      shown when installed but not activated
   Grant Input Monitoring…                         opens the pane and reveals kanata in Finder
   Grant Accessibility…
-  Launch at login                                 checkmark, toggles SMAppService.mainApp
-  Show in Dock                                    checkmark, applies immediately, persists to config
+  Launch at login                                 checkmark, toggles SMAppService.mainApp, writes config
+  Show in Dock                                    checkmark, applies immediately, writes config
 ------------------------------------------------
 Quit Barnata                                    ⌘Q, kanata keeps running
 Quit and stop kanata
 ```
 
-Implementation: AppKit `NSStatusItem` and `NSMenu` built from a `MenuState` value. No SwiftUI windows in the first version. Icons are `NSImage` with `isTemplate` set for files whose name ends in `Template` before the extension.
+Title line variants: `Running (<config>, layer: <layer>)`, `Starting`, `Stopping`, `Not running`, `Crashed (exit <code>)`, `Running for another user`, `Daemon not approved`, `Driver not installed`, `Driver <installed> is newer than required <required>`, `Config error: <message>`.
+
+`Running for another user` appears when `DaemonStatus.ownerUID` differs from the app's uid. Only "Stop kanata" stays enabled in that state.
+
+Implementation: AppKit `NSStatusItem` and `NSMenu` built from a `MenuState` value by `MenuBuilder`, which returns a plain `[MenuEntry]` tree before any AppKit object is created. No SwiftUI windows in the first version. Icons are `NSImage` with `isTemplate` set for files whose name ends in `Template` before the extension.
 
 ## App startup sequence
 
 1. Load `config.toml`. On parse error, show an error icon and an "Open config file" item. Keep running.
 2. Apply `show_dock_icon` and `launch_at_login` if present.
 3. Register the daemon. If `requiresApproval`, show the setup item and stop here until approved (poll every 5 s).
-4. Connect XPC, fetch `status`.
+4. Connect XPC, fetch `status`. Run the update flow if versions differ.
 5. If kanata is already running, adopt it: connect TCP, mark the matching preset as active.
 6. Otherwise, if a preset has `autorun = true`, send `start` for it.
 
@@ -250,16 +275,20 @@ Implementation: AppKit `NSStatusItem` and `NSMenu` built from a `MenuState` valu
 barnata/
   Package.swift
   Sources/
-    BarnataCore/          Config parsing, XPC protocol types, argument allowlist, icon lookup
-    Barnata/              AppKit app: AppDelegate, StatusItemController, MenuBuilder, DaemonClient, KanataTCPClient, IconStore
-    barnata-daemon/       main.swift, XPCListener, ProcessSupervisor, SignatureCheck, DriverManager, LogWriter
+    BarnataCore/          Config parsing and writing, XPC protocol types, argument allowlist, icon lookup
+    BarnataDaemonKit/     RequestValidator, ProcessSupervisor, Spawner, BackoffPolicy, SignatureCheck, DriverManager, LogWriter, XPCListener
+    barnata-daemon/       main.swift only
+    BarnataAppKit/        AppController, StatusItemController, MenuState, MenuBuilder, DaemonClient, KanataTCPClient, IconStore, ConfigWatcher, SetupActions
+    Barnata/              main.swift only
   Tests/
     BarnataCoreTests/
+    BarnataDaemonKitTests/
+    BarnataAppKitTests/
   Resources/
-    Info-App.plist, Info-Daemon.plist, daemon.plist, entitlements, status-icons/
+    Info-App.plist, Info-Daemon.plist, daemon.plist, status-icons/, driver-requirements.json
   Scripts/
-    vars.sh, fetch-kanata.sh, build-app.sh, sign.sh, notarize.sh, release.sh
+    vars.sh, fetch-kanata.sh, fetch-driver.sh, build-app.sh, sign.sh, notarize.sh, release.sh, dev-install.sh
   docs/
 ```
 
-SwiftPM only. No Xcode project. `Scripts/build-app.sh` assembles the `.app` from the SwiftPM products. Swift 6 language mode, strict concurrency.
+SwiftPM only. No Xcode project. `Scripts/build-app.sh` assembles the `.app` from the SwiftPM products. Swift 6 language mode, strict concurrency. `arm64` only.

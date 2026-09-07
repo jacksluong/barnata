@@ -4,49 +4,56 @@ Each phase ends with its acceptance criteria met before the next starts. Commit 
 
 ## Phase 0: prerequisites (manual, done by the user)
 
-Only the signing certificate and the toolchain are needed before writing code. Notarization credentials belong to Phase 5.
-
-1. Create a **Developer ID Application** certificate. Either in Xcode-beta > Settings > Accounts > Manage Certificates > `+` > Developer ID Application, or on developer.apple.com > Certificates with a CSR from Keychain Access. Confirm with `security find-identity -v -p codesigning`, which must list `Developer ID Application: <name> (<TEAMID>)`.
-2. Take the certificate's SHA-1 hash from that same output. `SIGNING_IDENTITY` always holds the hash, never the name: `codesign -s "<name>"` fails as ambiguous when more than one Developer ID Application certificate is in the keychain.
-3. Point the toolchain at Xcode-beta. `swift build` works on Command Line Tools alone, but `swift test` does not: Command Line Tools ships no `XCTest.framework` and cannot load the swift-testing macro plugin. Either `sudo xcode-select -s /Applications/Xcode-beta.app`, or rely on the `DEVELOPER_DIR` export in `Scripts/vars.sh`. `xcodebuild` is never used, and Command Line Tools already provides `notarytool` and `stapler`.
-
-Values for this machine, recorded in `Scripts/vars.sh`:
+Done. Recorded in `Scripts/vars.sh`:
 
 ```sh
 TEAM_ID=EE3526PL64
 SIGNING_IDENTITY=E20ADF15A9A4E3839E3E0D9BC60B5DBE81BD2F8D   # expires 2031-09-05
 ```
 
+`SIGNING_IDENTITY` always holds the SHA-1 hash, never the name.
+
+`swift build` works on Command Line Tools alone, but `swift test` does not. `Scripts/vars.sh` exports `DEVELOPER_DIR` pointing at Xcode-beta. `xcodebuild` is never used.
+
 ## Phase 1: repo skeleton and core module
 
-- `git init`, `Package.swift` with targets `BarnataCore` (library), `Barnata` (executable), `barnata-daemon` (executable), `BarnataCoreTests`. Platforms `.macOS(.v14)`. Dependency: TOMLKit.
-- `BarnataCore`: `Config` model and loader, `StartRequest`, `DaemonStatus`, `DriverStatus`, `CommandResult`, `KanataState`, `ArgAllowlist`, `IconResolver`, `XPCProtocols`, `Envelope` (Codable to `Data`).
-- Tests: config example from `02-config-format.md` parses; unknown key fails; `extra_args = ["--danger"]` fails naming the flag; `~` expansion; array and string `kanata_config`; `layer_icons` override semantics; allowlist accepts `--emergency-exit-code 3` and rejects `--emergency-exit-code x`.
+Done. `Package.swift` with targets `BarnataCore` (library), `Barnata` (executable), `barnata-daemon` (executable), `BarnataCoreTests`. Platforms `.macOS(.v14)`. Dependency: TOMLKit.
 
-Acceptance: `swift build` and `swift test` pass.
+Remaining additions to `BarnataCore` in later phases: `ConfigWriter` (Phase 4), `ownerUID` on `DaemonStatus` (Phase 3).
 
-## Phase 2: fetch and sign kanata
+## Phase 2: fetch kanata and the driver pkg
 
-- `Scripts/fetch-kanata.sh`: downloads `kanata_macos_arm64` and `kanata_macos_x86_64` for `KANATA_VERSION` from GitHub releases (the plain assets, never `*_cmd_allowed*`), verifies sha256 against values recorded in `Scripts/kanata.sha256`, combines with `lipo -create` into `build/kanata`.
+- `Scripts/fetch-kanata.sh`: downloads `macos-binaries-arm64.zip` for `KANATA_VERSION` from GitHub releases, verifies its sha256 against the value recorded in `Scripts/checksums.txt` (copied from the release's `sha256sums` asset), extracts `kanata_macos_arm64` (never `kanata_macos_cmd_allowed_arm64`) to `build/kanata`.
 - Sanity check in the script: `build/kanata --version` prints the pinned version, and a temp config using `(cmd ...)` fails `--check` with `compiled to never allow cmd`.
-- Signing of `kanata` happens in `Scripts/sign.sh` with identifier `io.jackyluong.barnata.kanata`, hardened runtime, timestamp.
+- `Scripts/fetch-driver.sh`: downloads `Karabiner-DriverKit-VirtualHIDDevice-${DRIVER_VERSION}.pkg` from `DRIVER_PKG_URL`, verifies its sha256 against `Scripts/checksums.txt`, and `pkgutil --check-signature` must report team `G43BCU2T37`. Output: `build/driver.pkg`.
+- Signing of `kanata` happens in `Scripts/sign.sh` with identifier `io.jackyluong.barnata.kanata`, hardened runtime.
 
-Acceptance: `build/kanata` is universal (`lipo -info`) and passes both checks.
+Acceptance: `build/kanata` is `arm64` (`file build/kanata`) and passes both checks. `build/driver.pkg` passes the signature check.
 
 ## Phase 3: daemon
 
-- `main.swift`: `NSXPCListener(machServiceName:)`, set `setCodeSigningRequirement` on each incoming connection, idle-exit timer (60 s with no child and no clients).
-- `ProcessSupervisor`: spawn, stop, restart, crash backoff, log redirection with rotation, TCC responsibility disclaim.
-- `SignatureCheck`: `SecStaticCodeCreateWithPath` + `SecRequirementCreateWithString` + `SecStaticCodeCheckValidity` helper used for kanata, the Karabiner daemon, and the Karabiner manager.
-- `DriverManager`: `DriverStatus` collection, `ensureVirtualHIDDaemon`, `activateDriver`.
-- `RequestValidator`: enforces every rule in the privilege boundary section of `01-architecture.md`.
+Targets: `BarnataDaemonKit` (library) and `BarnataDaemonKitTests`. `barnata-daemon/main.swift` only constructs and runs `XPCListener`.
+
+- `XPCListener`: `NSXPCListener(machServiceName:)`, `setCodeSigningRequirement` on each incoming connection, idle-exit timer (60 s with no kanata child and no clients), `shutdown` handling.
+- `Spawner` protocol with a `PosixSpawner` implementation (spawn, signal, wait, stdout/stderr capture, TCC responsibility disclaim).
+- `ProcessSupervisor`: start, stop, restart, crash state from exit code, `BackoffPolicy`, stderr tail for `lastError`, log redirection with rotation.
+- `SignatureCheck`: `SecStaticCodeCreateWithPath` + `SecRequirementCreateWithString` + `SecStaticCodeCheckValidity` helper used for kanata, the Karabiner daemon, and the Karabiner manager. `pkgutil --check-signature` wrapper for the pkg.
+- `DriverManager`: `DriverStatus` collection, `ensureVirtualHIDDaemon`, `installDriver`, `activateDriver`.
+- `RequestValidator`: enforces every rule in the privilege boundary section of `01-architecture.md`, including the uid ownership check.
 - Logging through `os.Logger(subsystem: "io.jackyluong.barnata", category: "daemon")`.
 - Daemon entitlements: none. Hardened runtime on.
 
-Manual test harness for this phase: `Scripts/build-app.sh --debug` produces an unsigned-for-distribution but ad-hoc-signed bundle in `build/Barnata.app`; `Scripts/dev-install.sh` copies it to `/Applications` and launches it. This phase uses the Developer ID identity from Phase 0.
+Tests (XCTest, `BarnataDaemonKitTests`):
+
+- `RequestValidator`: relative path, directory, symlink to directory, nonexistent file, file owned by another uid without world-read, port out of range, disallowed flag. Each rejected with a message naming the rule.
+- `BackoffPolicy`: delays 1, 2, 4, 8, 30, 30; gives up on the sixth crash inside 2 minutes; counter resets after 2 minutes.
+- `ProcessSupervisor` with a fake `Spawner`: exit 0 sets `idle`, exit 1 sets `crashed`, `autorestartOnCrash` schedules a restart, `stop` sends SIGTERM then SIGKILL after 3 s.
+
+Manual test harness: `Scripts/build-app.sh --debug` produces a Developer ID signed bundle in `build/Barnata.app` without timestamp or notarization; `Scripts/dev-install.sh` copies it to `/Applications` and launches it.
 
 Acceptance:
 
+- `swift test` passes.
 - `launchctl print system/io.jackyluong.barnata.daemon` shows the service after approval.
 - A throwaway Swift client connecting with the wrong signature is rejected (test by running the client ad-hoc signed).
 - Start, stop, restart, and crash recovery (kill -9 the kanata pid) behave as specified.
@@ -54,30 +61,42 @@ Acceptance:
 
 ## Phase 4: app
 
-- `AppDelegate`: startup sequence from `01-architecture.md`, config file watcher (`DispatchSource` on the file and its directory, reload on change, rebuild menu).
+Targets: `BarnataAppKit` (library) and `BarnataAppKitTests`. `Barnata/main.swift` only creates `NSApplication` and `AppController`.
+
+- `AppController`: startup sequence and update flow from `01-architecture.md`.
+- `ConfigWatcher`: `DispatchSource` on the file and its directory, reload on change, echo suppression by modification date, rebuild menu.
+- `ConfigWriter` in `BarnataCore`: line edit per `02-config-format.md`.
 - `DaemonClient`: `NSXPCConnection(machServiceName:)`, reconnect with backoff, `subscribe` with an anonymous listener.
 - `KanataTCPClient`: `NWConnection` to `127.0.0.1:<port>`, line framing, message enum, reconnect logic.
-- `StatusItemController` and `MenuBuilder`: menu from `01-architecture.md`, icon priority rules, template icon detection, 2 s reload flash.
-- `SetupActions`: `SMAppService.daemon` register and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent` and `?Privacy_Accessibility`, `NSWorkspace.activateFileViewerSelecting` on the bundled kanata, driver pkg URL.
-- `show_dock_icon`: `Info.plist` has `LSUIElement = true`; `true` in config calls `NSApp.setActivationPolicy(.regular)` at launch and on toggle. Toggle writes the key back to `config.toml` preserving the rest of the file (TOMLKit round trip on the `[app]` table only).
+- `MenuState` and `MenuBuilder`: value type to `[MenuEntry]` tree, no AppKit imports.
+- `StatusItemController`: renders `[MenuEntry]` into `NSMenu`, icon priority rules, template icon detection, 2 s reload flash, 400 ms delayed spinner for `starting` and `stopping`.
+- `SetupActions`: `SMAppService.daemon` register and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent`, `?Privacy_Accessibility`, and the Driver Extensions pane, `NSWorkspace.activateFileViewerSelecting` on the bundled kanata.
+- `show_dock_icon`: `Info.plist` has `LSUIElement = true`; `true` in config calls `NSApp.setActivationPolicy(.regular)` at launch and on toggle.
 - App entitlements: none. Hardened runtime on. No sandbox.
+
+Tests (XCTest):
+
+- `BarnataCoreTests`: `ConfigWriter` preserves comments, order, and trailing comments; inserts `[app]` when missing; appends a missing key; replaces an existing key.
+- `BarnataAppKitTests`: `MenuBuilder` for each title line variant in `01-architecture.md`, the Setup items shown per `DriverStatus` and daemon status, "Running for another user" enables only Stop, preset checkmark, layer checkmark.
 
 Acceptance:
 
+- `swift test` passes.
 - Fresh install flow on this machine: launch, approve daemon once with password, grant Input Monitoring and Accessibility to the bundled kanata, autorun preset starts, layer icon changes when switching layers on the keyboard.
 - Quit the app; typing still remapped. Relaunch; menu shows Running and the current layer without restarting kanata.
 - Edit `canary.kbd`, choose Reload config, `ConfigFileReload` arrives and the icon flashes.
-- Set `show_dock_icon = true` in the file, the Dock icon appears within a second. Set it back, it disappears.
+- Set `show_dock_icon = true` in the file, the Dock icon appears within a second. Set it back, it disappears. Toggle it from the menu, the file changes and the watcher does not reload twice.
 - Toggle Launch at login, the app appears under System Settings > Login Items.
 - Break the config file syntax, menu shows the error, fix it, menu recovers.
+- Install a build with a bumped `CFBundleVersion` over the running one with `dev-install.sh`; kanata restarts once and the menu shows the new version.
 
 ## Phase 5: packaging
 
-- `Scripts/build-app.sh`: `swift build -c release --arch arm64 --arch x86_64`, assemble the bundle layout in `01-architecture.md`, write `Info.plist` with `CFBundleVersion` and `CFBundleShortVersionString` from `git describe`, copy `daemon.plist`, `kanata`, resources.
-- `Scripts/sign.sh`: sign inside-out with `--options runtime --timestamp`: `kanata`, `barnata-daemon`, `Barnata` executable, then the bundle. Verify with `codesign --verify --deep --strict` and `spctl --assess --type execute`.
+- `Scripts/build-app.sh`: `swift build -c release` (`arm64`), assemble the bundle layout in `01-architecture.md`, write `Info.plist` with `CFBundleVersion` and `CFBundleShortVersionString` from `git describe`, copy `daemon.plist`, `kanata`, `driver.pkg`, resources. `--debug` builds debug and signs without `--timestamp`.
+- `Scripts/sign.sh`: sign inside-out with `--options runtime` (`--timestamp` unless `--debug`): `kanata`, `barnata-daemon`, `Barnata` executable, then the bundle. Verify with `codesign --verify --deep --strict`.
 - One-time before the first notarization: create an app-specific password at appleid.apple.com > Sign-In and Security > App-Specific Passwords, then `xcrun notarytool store-credentials barnata --apple-id <apple id> --team-id EE3526PL64` and paste it when prompted. The password is stored in the keychain under the profile name `barnata` and never appears in a script.
 - `Scripts/notarize.sh`: `ditto -c -k --keepParent` to zip, `xcrun notarytool submit --keychain-profile barnata --wait`, `xcrun stapler staple`, re-zip.
-- `Scripts/release.sh`: runs the three above, tags, uploads `Barnata-<version>.zip` with `gh release create`, prints the sha256 for the cask.
+- `Scripts/release.sh`: runs build, sign, notarize, tags, uploads `Barnata-<version>.zip` with `gh release create`, prints the sha256.
 
 Acceptance: `spctl --assess --type execute --verbose build/Barnata.app` prints `accepted, source=Notarized Developer ID`. Copying the zip to a second Mac and opening it shows no Gatekeeper warning.
 
@@ -87,8 +106,10 @@ Follow `04-distribution.md` and `05-dotfiles-migration.md`. Then run `06-verific
 
 ## Deferred
 
-- Pre-login remapping (daemon starts the last preset at boot from a root-owned state file).
+- Pre-login remapping (daemon starts the last preset at boot from a root-owned state file under `/Library/Application Support/Barnata/`).
 - Hooks running in the app.
 - Settings window.
 - CI release workflow.
-- Uninstall command (`Barnata.app/Contents/MacOS/Barnata --uninstall` that unregisters the daemon and login item and removes `/Library/Application Support/Barnata` and logs).
+- Homebrew tap, once the repo is public.
+- Multi-user support.
+- Uninstall command (`Barnata.app/Contents/MacOS/Barnata --uninstall` that unregisters the daemon and login item and removes logs).

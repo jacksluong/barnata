@@ -23,6 +23,7 @@ ps -axo user,pid,ppid,command | grep -E 'kanata|Karabiner-VirtualHIDDevice-Daemo
 codesign -dv --verbose=2 /Applications/Barnata.app
 codesign -dv --verbose=2 /Applications/Barnata.app/Contents/MacOS/kanata
 spctl --assess --type execute --verbose /Applications/Barnata.app
+pkgutil --check-signature /Applications/Barnata.app/Contents/Resources/Karabiner-DriverKit-VirtualHIDDevice-*.pkg
 
 # driver
 systemextensionsctl list | grep pqrs
@@ -30,11 +31,11 @@ systemextensionsctl list | grep pqrs
 
 ## Checklist
 
-Run in order on a machine that has never had Barnata. Items marked (this Mac) also run on the migration machine after `05-dotfiles-migration.md`.
+Run in order on a machine that has never had Barnata or Karabiner-Elements. Items marked (this Mac) also run on the migration machine after `05-dotfiles-migration.md`.
 
 Install
 
-- [ ] `brew install --cask jacksluong/tap/barnata` places the app in `/Applications` with no Gatekeeper warning on first open.
+- [ ] The `gh release download` steps from `04-distribution.md` place the app in `/Applications` with no Gatekeeper warning on first open.
 - [ ] Opening the app from `~/Downloads` shows the "move to /Applications" alert and quits.
 
 First launch
@@ -42,7 +43,8 @@ First launch
 - [ ] Menu bar icon appears. No Dock icon.
 - [ ] Setup shows "Approve background daemon…". Clicking opens Login Items. Approving asks for the admin password once.
 - [ ] After approval the item disappears within 5 s without relaunching the app.
-- [ ] Setup shows the driver items when the pkg is missing and hides them when installed and activated.
+- [ ] Setup shows "Install Karabiner driver…". One click installs the pkg, no password, and System Settings opens on Driver Extensions. After allowing, the item disappears and `systemextensionsctl list` shows the dext activated.
+- [ ] (this Mac) With Karabiner-Elements present, no driver items are shown and `DaemonStatus.driver.vhidDaemonManagedByBarnata` is false.
 - [ ] Grant Input Monitoring reveals `/Applications/Barnata.app/Contents/MacOS/kanata` in Finder and opens the pane. Same for Accessibility.
 - [ ] After grants, the autorun preset starts and the keyboard is remapped. No password prompt.
 
@@ -53,18 +55,22 @@ Running
 - [ ] Choosing a layer in the submenu switches to it.
 - [ ] Reload config after editing the `.kbd` file applies the change, the icon flashes reloading.
 - [ ] Reload with a syntax error keeps the old config running and shows the kanata error message in the menu title line.
-- [ ] `kill -9 <kanata pid>` with `autorestart_on_crash = false` shows Crashed. With `true`, kanata is back within 2 s and the restart count increments.
-- [ ] Emergency exit (LCtrl+Space+Esc) shows Not Running, no restart.
+- [ ] `kill -9 <kanata pid>` with `autorestart_on_crash = false` shows Crashed with the exit code. With `true`, kanata is back within 2 s and the restart count increments.
+- [ ] Six `kill -9` inside 2 minutes with `autorestart_on_crash = true`: the daemon gives up and the menu shows Crashed.
+- [ ] Start with a `.kbd` that has a parse error: menu title shows the kanata error text from `lastError`.
+- [ ] Emergency exit (LCtrl+Space+Esc) shows Not running with the `paused` icon, no restart.
 - [ ] Stop kanata, then start a different preset. Only one kanata process exists at any time.
+- [ ] Stop kanata on a Mac without Karabiner-Elements: `Karabiner-VirtualHIDDevice-Daemon` exits too.
+- [ ] Suspend kanata startup (`kill -STOP` the pid right after start): after 400 ms the status item shows a spinner; `kill -CONT` returns the layer icon.
 
 App lifecycle
 
 - [ ] Quit Barnata. Remapping continues. `barnata-daemon` and `kanata` are still running.
 - [ ] Relaunch. Menu shows Running with the right preset and layer within 2 s. kanata pid unchanged.
 - [ ] Quit and stop kanata. Remapping ends. The daemon exits within 60 s.
-- [ ] Launch at login toggle is reflected in System Settings > Login Items. Reboot: app is present, kanata starts without any prompt.
+- [ ] Launch at login toggle is reflected in System Settings > Login Items and `launch_at_login` changes in `config.toml` with comments intact. Reboot: app is present, kanata starts without any prompt.
 - [ ] Config file watcher: edit `config.toml`, the menu rebuilds. Break it, error shown, fix it, recovered.
-- [ ] `show_dock_icon = true` adds the Dock icon at once. `false` removes it.
+- [ ] `show_dock_icon = true` in the file adds the Dock icon at once. `false` removes it. The menu toggle writes the file and the app log shows one reload, not two.
 
 Security
 
@@ -72,12 +78,14 @@ Security
 - [ ] An ad-hoc signed copy of the app cannot connect to the daemon (connection invalidated, daemon log shows the rejection).
 - [ ] Replacing `Contents/MacOS/kanata` with another binary makes `start` fail with a signature error and nothing is spawned.
 - [ ] `start` with a config path that is a directory, a symlink to a directory, or a nonexistent file fails with a validation message.
+- [ ] `start` with a config path owned by root and mode 0600 fails with an ownership message.
 - [ ] `extra_args = ["--cfg-stdin"]` is rejected at config load.
+- [ ] Replacing the bundled pkg with an unsigned pkg makes "Install driver…" fail with a signature error and nothing is installed.
 
 Update
 
-- [ ] Install a newer build over the old one. On launch the daemon is re-registered without a password prompt and `status` reports the new version.
+- [ ] Install a newer build over the old one. On launch kanata restarts once, `status` reports the new daemon version, and no password prompt appears.
 
 Uninstall
 
-- [ ] `brew uninstall --cask barnata` stops the daemon and removes the app. `launchctl print system/io.jackyluong.barnata.daemon` reports not found after the next login.
+- [ ] Quit and stop kanata, delete `/Applications/Barnata.app`. `launchctl print system/io.jackyluong.barnata.daemon` reports not found after the next login.

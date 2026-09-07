@@ -1,11 +1,28 @@
 # 05. Dotfiles migration
 
-Repo `~/dotfiles`, chezmoi source root `home/`. Every path below is relative to `home/` unless it starts with `Brewfile` or `README.md`.
+Repo `~/Developer/dotfiles`, chezmoi source root `home/`. Every path below is relative to `home/` unless it starts with `Brewfile` or `README.md`.
 
 ## Files to add
 
 - `dot_config/barnata/config.toml`: the full example from `02-config-format.md`.
 - `dot_config/barnata/icons/*.png`: moved from `private_Library/private_Application Support/kanata-tray/icons/`. Same nine files plus `default.png`.
+- `.chezmoiscripts/run_once_after_46-barnata-install.sh`: installs or upgrades the app from the private GitHub release. Requires `gh` to be authenticated, which an earlier script already ensures.
+
+  ```bash
+  #!/bin/bash
+  set -euo pipefail
+
+  if [[ -d /Applications/Barnata.app ]]; then
+    exit 0
+  fi
+
+  echo "==> Installing Barnata"
+  tmp="$(mktemp -d)"
+  gh release download --repo jacksluong/barnata --pattern 'Barnata-*.zip' --dir "$tmp" --clobber
+  ditto -x -k "$tmp"/Barnata-*.zip /Applications
+  rm -rf "$tmp"
+  ```
+
 - `.chezmoiscripts/run_once_after_47-kanata-tray-cleanup.sh`: removes the old setup on machines that had it. Idempotent; exits 0 when nothing is present.
 
   ```bash
@@ -58,27 +75,30 @@ Repo `~/dotfiles`, chezmoi source root `home/`. Every path below is relative to 
 
 ```
 - brew "kanata-tray"
-+ tap "jacksluong/tap"
-+ cask "jacksluong/tap/barnata"
 ```
 
-Keep `brew "kanata"`. It is used for editing and `kanata --check` from the shell and is not executed by Barnata.
+Keep `brew "kanata"`. It is used for editing and `kanata --check` from the shell and is not executed by Barnata. Nothing is added; the cask arrives when the repo goes public.
 
-Karabiner-Elements is not in the Brewfile today and stays optional. On a machine without it, the daemon starts the virtual HID daemon itself. The driver pkg still has to be installed by hand; the app's Setup menu links to it.
+Karabiner-Elements is not in the Brewfile and stays optional. Barnata installs and runs the virtual HID driver itself when Karabiner-Elements is absent.
+
+## Config edits by the app
+
+Barnata writes `launch_at_login` and `show_dock_icon` back into `config.toml` when toggled from the menu. After such a toggle, `chezmoi re-add ~/.config/barnata/config.toml` records the change in the source state.
 
 ## Script order after the change
 
 ```
 run_once_before_00-install-homebrew.sh
 run_once_before_05-home-dirs.sh
-run_onchange_before_10-brew-bundle.sh.tmpl      installs the barnata cask
+run_onchange_before_10-brew-bundle.sh.tmpl
 run_once_before_20-install-tools.sh
 run_once_after_25-ssh-keys.sh.tmpl
 run_once_after_30-vim-plugins.sh
 run_once_after_45-dotfiles-git-hooks.sh
-run_once_after_47-kanata-tray-cleanup.sh        new
-run_onchange_after_49-barnata-launch.sh.tmpl  new
-run_once_after_99-manual-steps.sh               text updated
+run_once_after_46-barnata-install.sh              new
+run_once_after_47-kanata-tray-cleanup.sh          new
+run_onchange_after_49-barnata-launch.sh.tmpl    new
+run_once_after_99-manual-steps.sh                 text updated
 ```
 
 ## `run_once_after_99-manual-steps.sh` replacement text for the kanata section
@@ -87,9 +107,8 @@ run_once_after_99-manual-steps.sh               text updated
   * Barnata: it launched at the end of `chezmoi apply`. Finish in its
     menu bar item under Setup:
       1. Approve background daemon (admin password once).
-      2. If the Karabiner driver is missing, Install driver, then Activate
-         driver and allow it under System Settings > General > Login Items
-         & Extensions > Driver Extensions.
+      2. If shown, Install Karabiner driver. One click installs and
+         activates it; allow it in the System Settings pane that opens.
       3. Grant Input Monitoring and Grant Accessibility for the bundled
          kanata (System Settings opens; drag the revealed binary into each
          list, or click + and pick it).
@@ -112,7 +131,7 @@ approval and the Input Monitoring and Accessibility grants for kanata.
 
 ## Order of operations on this machine
 
-1. Ship Barnata 0.1.0 and the cask.
+1. Ship Barnata 0.1.0 as a GitHub release.
 2. Apply the dotfiles change. The cleanup script asks for sudo once to delete the sudoers file. That is the last sudo prompt.
 3. Finish the Setup menu items.
 4. Confirm `/etc/sudoers.d` is empty, `launchctl list | grep kanata-tray` is empty, and `ps aux | grep kanata` shows one `kanata` under `barnata-daemon`.

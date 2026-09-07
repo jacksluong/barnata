@@ -8,9 +8,16 @@
 | `Contents/MacOS/barnata-daemon` | `io.jackyluong.barnata.daemon` | `--options runtime --timestamp` |
 | `Contents/MacOS/Barnata` and the bundle | `io.jackyluong.barnata` | `--options runtime --timestamp` |
 
-All three use the same Developer ID Application identity. The daemon plist's `BundleProgram` target and the app must share the Team ID or `SMAppService` refuses registration.
+All three use the same Developer ID Application identity. The daemon plist's `BundleProgram` target and the app must share the Team ID or `SMAppService` refuses registration. `Contents/Resources/*.pkg` is sealed as a resource and keeps its pqrs signature.
 
-No entitlements files. The app is not sandboxed. Hardened runtime is on for every binary.
+No entitlements files. The app is not sandboxed. Hardened runtime is on for every binary. `arm64` only.
+
+Two build flavors:
+
+| Flavor | Command | Signing | Notarized | Use |
+|---|---|---|---|---|
+| debug | `Scripts/build-app.sh --debug` then `Scripts/dev-install.sh` | Developer ID, no timestamp | no | local loop on this Mac |
+| release | `Scripts/release.sh` | Developer ID, timestamp | yes, stapled | any Mac |
 
 `Info.plist` for the app:
 
@@ -22,6 +29,7 @@ CFBundlePackageType         APPL
 CFBundleShortVersionString  <git describe --tags>
 CFBundleVersion             <commit count>
 LSMinimumSystemVersion      14.0
+LSArchitecturePriority      arm64
 LSUIElement                 true
 NSHumanReadableCopyright    Jacky Luong
 ```
@@ -41,9 +49,25 @@ On rejection, `xcrun notarytool log <id> --keychain-profile barnata` lists the o
 
 ## Release artifact
 
-`Barnata-<version>.zip` attached to a GitHub release on `jacksluong/barnata`. No dmg. No pkg.
+`Barnata-<version>.zip` attached to a GitHub release on `jacksluong/barnata`. No dmg. No pkg. The repo is private; downloads need `gh` authentication.
 
-## Homebrew tap
+## Install on another Mac
+
+```
+gh release download --repo jacksluong/barnata --pattern 'Barnata-*.zip' --dir /tmp/barnata --clobber
+ditto -x -k /tmp/barnata/Barnata-*.zip /Applications
+open -a Barnata
+```
+
+The same three commands upgrade an existing install. `05-dotfiles-migration.md` wraps them in a chezmoi script.
+
+The bundle must run from `/Applications`. Running from `~/Downloads` is refused by the app with an alert that names `/Applications`.
+
+## Updating
+
+Install the new version over the old one. On launch the app runs the update flow in `01-architecture.md`: stop kanata, ask the old daemon to shut down, reconnect to the new one, restart the preset. No re-approval, no password.
+
+## Homebrew tap (deferred until the repo is public)
 
 Repo `jacksluong/homebrew-tap`, file `Casks/barnata.rb`:
 
@@ -58,33 +82,15 @@ cask "barnata" do
   homepage "https://github.com/jacksluong/barnata"
 
   depends_on macos: ">= :sonoma"
+  depends_on arch: :arm64
 
   app "Barnata.app"
 
   uninstall launchctl: "io.jackyluong.barnata.daemon",
             quit:      "io.jackyluong.barnata"
 
-  zap trash: [
-    "~/.config/barnata",
-    "~/Library/Logs/Barnata",
-  ]
+  zap trash: "~/.config/barnata"
 end
 ```
 
-`Scripts/release.sh` prints the two lines to update (`version`, `sha256`). Bumping the cask is a manual commit to the tap.
-
-Install on any Mac:
-
-```
-brew install --cask jacksluong/tap/barnata
-```
-
-Homebrew places the app in `/Applications`. The bundle must run from `/Applications`.
-
-## Manual install without Homebrew
-
-Download the zip, unzip, drag `Barnata.app` to `/Applications`, open it. Running from `~/Downloads` is refused by the app with an alert that names `/Applications`.
-
-## Updating
-
-Install the new version over the old one. On launch the app sees the daemon version mismatch, calls `unregister()` then `register()`, and the next `start` uses the new daemon. Kanata is restarted by the app after an update when the bundled kanata version changed; the app compares `DaemonStatus.kanataVersion` to its own bundled version string.
+`Scripts/release.sh` already prints the sha256. Bumping the cask is a manual commit to the tap.

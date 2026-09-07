@@ -2,7 +2,7 @@
 
 File: `~/.config/barnata/config.toml`. Override the location with the `BARNATA_CONFIG` environment variable (absolute path to a file). Icons live in `icons/` next to the config file. Relative icon paths resolve against that directory.
 
-The config file is the single source of truth. The app never writes to it except for the two settings marked writable below, and only when their menu items are toggled.
+The config file is the single source of truth. The app writes to it only for the two keys marked writable below, and only when their menu items are toggled.
 
 ## Schema
 
@@ -32,6 +32,17 @@ Rules:
 - Preset order in the menu is the order in the file.
 - Unknown keys are errors.
 - `layer_icons` in a preset replaces the defaults table entirely.
+
+## Writing `launch_at_login` and `show_dock_icon`
+
+`ConfigWriter` in `BarnataCore` edits the file line by line and never re-serializes it:
+
+1. Find the `[app]` table header. If absent, insert `[app]` and a blank line at the top of the file.
+2. Inside that table (up to the next header), find the first line whose key is the target. Replace the value on that line, keeping indentation and any trailing comment.
+3. If the key is absent, append `key = value` as the last line of the table.
+4. Write atomically (temp file plus rename) and record the resulting modification date.
+
+`ConfigWatcher` ignores the next change event whose modification date equals the recorded one.
 
 ## Full example matching the current setup
 
@@ -71,4 +82,4 @@ autorun = true
 
 ## Parsing
 
-Use [TOMLKit](https://github.com/LebJe/TOMLKit) via SwiftPM. Decode into `Codable` structs in `BarnataCore`. Validation errors carry the TOML key path in the message.
+Use [TOMLKit](https://github.com/LebJe/TOMLKit) via SwiftPM for reading only. Decode into structs in `BarnataCore`. Validation errors carry the TOML key path in the message.
