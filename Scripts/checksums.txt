@@ -1,0 +1,5 @@
+# sha256 of every downloaded artifact. kanata values are copied from the release's
+# sha256sums asset; the driver pkg value is computed from the downloaded file.
+
+839769d189911b5881e11550eaa2039705213fb725865d088f5a2e3a6c10de32  macos-binaries-arm64.zip
+b57e9321f9f75de0b90daec5f5a8b67b502499613fb2be690663b9fa0e5aa8c2  Karabiner-DriverKit-VirtualHIDDevice-6.8.0.pkg
