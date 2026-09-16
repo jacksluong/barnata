@@ -13,7 +13,7 @@ SIGNING_IDENTITY=E20ADF15A9A4E3839E3E0D9BC60B5DBE81BD2F8D   # expires 2031-09-05
 
 `SIGNING_IDENTITY` always holds the SHA-1 hash, never the name.
 
-`swift build` works on Command Line Tools alone, but `swift test` does not. `Scripts/vars.sh` exports `DEVELOPER_DIR` pointing at Xcode-beta. `xcodebuild` is never used.
+`swift build` works on Command Line Tools alone, but `swift test` does not. `Scripts/vars.sh` exports `DEVELOPER_DIR` pointing at `/Applications/Xcode.app`. `xcodebuild` is never used.
 
 ## Phase 1: repo skeleton and core module
 
@@ -54,10 +54,13 @@ Manual test harness: `Scripts/build-app.sh --debug` produces a Developer ID sign
 Acceptance:
 
 - `swift test` passes.
-- `launchctl print system/io.jackyluong.barnata.daemon` shows the service after approval.
-- A throwaway Swift client connecting with the wrong signature is rejected (test by running the client ad-hoc signed).
-- Start, stop, restart, and crash recovery (kill -9 the kanata pid) behave as specified.
 - `/Library/Logs/Barnata/kanata.log` contains kanata output and is readable by the user.
+
+Three further checks need a daemon that launchd has actually started, which requires the `SMAppService` registration built in Phase 4. They are listed under Phase 4 acceptance:
+
+- `launchctl print system/io.jackyluong.barnata.daemon` shows the service after approval.
+- A throwaway Swift client connecting with the wrong signature is rejected.
+- Start, stop, restart, and crash recovery (kill -9 the kanata pid) behave as specified.
 
 ## Phase 4: app
 
@@ -70,7 +73,8 @@ Targets: `BarnataAppKit` (library) and `BarnataAppKitTests`. `Barnata/main.swift
 - `KanataTCPClient`: `NWConnection` to `127.0.0.1:<port>`, line framing, message enum, reconnect logic.
 - `MenuState` and `MenuBuilder`: value type to `[MenuEntry]` tree, no AppKit imports.
 - `StatusItemController`: renders `[MenuEntry]` into `NSMenu`, icon priority rules, template icon detection, 2 s reload flash, 400 ms delayed spinner for `starting` and `stopping`.
-- `SetupActions`: `SMAppService.daemon` register and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent`, `?Privacy_Accessibility`, and the Driver Extensions pane, `NSWorkspace.activateFileViewerSelecting` on the bundled kanata.
+- `IconStore`: bundled status icons are SF Symbols (`keyboard`, `exclamationmark.triangle.fill`, `pause.circle`, `arrow.triangle.2.circlepath`), so no image assets are committed. `app.status_icons` still overrides them with PNGs from the config directory through `IconResolver`.
+- `SetupActions`: `SMAppService.daemon` register and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent`, `?Privacy_Accessibility`, and the Driver Extensions pane, `NSWorkspace.activateFileViewerSelecting` on the app bundle. `IOHIDCheckAccess`/`IOHIDRequestAccess` and `AXIsProcessTrusted`/`AXIsProcessTrustedWithOptions` read and request the two privacy grants from the app, which is the only side that can show the prompt.
 - `show_dock_icon`: `Info.plist` has `LSUIElement = true`; `true` in config calls `NSApp.setActivationPolicy(.regular)` at launch and on toggle.
 - App entitlements: none. Hardened runtime on. No sandbox.
 
@@ -80,6 +84,14 @@ Tests (XCTest):
 - `BarnataAppKitTests`: `MenuBuilder` for each title line variant in `01-architecture.md`, the Setup items shown per `DriverStatus` and daemon status, "Running for another user" enables only Stop, preset checkmark, layer checkmark.
 
 Acceptance:
+
+Carried over from Phase 3, now that the app can register the daemon:
+
+- `launchctl print system/io.jackyluong.barnata.daemon` shows the service after approval. `Scripts/dev-install.sh` prints it at the end of every install.
+- A throwaway Swift client connecting with the wrong signature is rejected (build it with plain `swift build` so it is ad-hoc signed, connect to the Mach service, and confirm the daemon log shows the refusal).
+- Start, stop, restart, and crash recovery behave as specified: `kill -9` the kanata pid with `autorestart_on_crash = true` and kanata is back within 2 s with `restartCount` incremented; with `false` the menu shows Crashed and the exit code.
+
+Phase 4 proper:
 
 - `swift test` passes.
 - Fresh install flow on this machine: launch, approve daemon once with password, grant Input Monitoring and Accessibility to the bundled kanata, autorun preset starts, layer icon changes when switching layers on the keyboard.

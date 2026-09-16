@@ -53,7 +53,7 @@ Gathered on 2026-09-04 from `~/Developer/dotfiles` and the running system.
 - Karabiner-Elements 16.2.0 is installed. Its SMAppService-registered daemons run `Karabiner-VirtualHIDDevice-Daemon` (driver pkg 6.8.0, dext bundle version 1.8.0) as root at boot. The daemon plist lives in `/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Privileged Daemons v2.app/Contents/Library/LaunchDaemons/`.
 - kanata TCP server on port 5829 answers `Hello` with protocol 1 and capabilities `reload, layer-names, fake-key-names, layer-change, hold-activated, tap-activated, current-layer-name, current-layer-info, fake-key, set-mouse`. Layer names: `base, typing, arrows, numbers, launcher, system, navcode, modnums, nohrm`.
 - Both `kanata` and `kanata-tray` are granted Input Monitoring and Accessibility.
-- Toolchain: Swift 6.4, `Xcode-beta.app` in `/Applications`, `xcode-select` points at the command line tools. `notarytool` is available.
+- Toolchain: Swift 6.4, `Xcode.app` in `/Applications`, `xcode-select` points at it. `notarytool` is available.
 - One `Developer ID Application: Jacky Luong (EE3526PL64)` certificate is in the keychain. `SIGNING_IDENTITY` holds its SHA-1 hash.
 
 ## Version coupling to track

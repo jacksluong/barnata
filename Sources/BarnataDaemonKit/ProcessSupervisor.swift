@@ -44,6 +44,7 @@ public final class ProcessSupervisor: @unchecked Sendable {
     private let logWriter: LogWriter?
     private let scheduler: Scheduler
     private let queue: DispatchQueue
+    private let notifications: DispatchQueue
     private let onChange: @Sendable (SupervisorSnapshot) -> Void
 
     private var backoff: BackoffPolicy
@@ -73,6 +74,7 @@ public final class ProcessSupervisor: @unchecked Sendable {
         self.logWriter = logWriter
         self.scheduler = scheduler
         self.queue = queue
+        self.notifications = DispatchQueue(label: queue.label + ".notifications")
         self.onChange = onChange
         self.backoff = configuration.backoff
     }
@@ -276,9 +278,11 @@ public final class ProcessSupervisor: @unchecked Sendable {
         }
     }
 
+    /// Listeners run on their own serial queue, never while `queue` is held, so they may read `snapshot`
     private func transition(to newState: KanataState) {
         state = newState
-        onChange(currentSnapshot())
+        let snapshot = currentSnapshot()
+        notifications.async { self.onChange(snapshot) }
     }
 
     private func currentSnapshot() -> SupervisorSnapshot {

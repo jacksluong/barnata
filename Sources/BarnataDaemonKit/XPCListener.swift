@@ -38,7 +38,7 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
             ),
             spawner: spawner,
             logWriter: logWriter,
-            onChange: { _ in holder.service?.supervisorDidChange() }
+            onChange: { snapshot in holder.service?.supervisorDidChange(snapshot) }
         )
         let driverManager = DriverManager(
             layout: layout,

@@ -1,3 +1,4 @@
+import BarnataCore
 import Foundation
 import Security
 
@@ -68,18 +69,7 @@ public struct SignatureCheck: BinaryValidating {
 
     /// Team identifier from the daemon's own signature, so the client requirement needs no build-time constant
     public static func selfTeamIdentifier() -> String? {
-        var code: SecCode?
-        guard SecCodeCopySelf([], &code) == errSecSuccess, let code else { return nil }
-
-        var staticCode: SecStaticCode?
-        guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode else { return nil }
-
-        var information: CFDictionary?
-        guard SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &information) == errSecSuccess,
-              let dictionary = information as? [String: Any]
-        else { return nil }
-
-        return dictionary[kSecCodeInfoTeamIdentifier as String] as? String
+        CodeSignature.selfTeamIdentifier()
     }
 
     private static func message(for status: OSStatus) -> String {

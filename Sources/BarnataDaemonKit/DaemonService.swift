@@ -110,15 +110,15 @@ final class DaemonService: NSObject, BarnataDaemonProtocol, @unchecked Sendable 
         driverManager.terminateVirtualHIDDaemon()
     }
 
-    func supervisorDidChange() {
-        push(currentStatus())
+    func supervisorDidChange(_ snapshot: SupervisorSnapshot) {
+        push(currentStatus(snapshot))
         onIdleChange()
     }
 
     // MARK: - Internals
 
-    private func currentStatus() -> DaemonStatus {
-        let snapshot = supervisor.snapshot
+    private func currentStatus(_ provided: SupervisorSnapshot? = nil) -> DaemonStatus {
+        let snapshot = provided ?? supervisor.snapshot
         return DaemonStatus(
             daemonVersion: DaemonService.bundleVersion(layout: layout),
             kanataVersion: kanataVersion(),

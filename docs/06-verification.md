@@ -45,7 +45,10 @@ First launch
 - [ ] After approval the item disappears within 5 s without relaunching the app.
 - [ ] Setup shows "Install Karabiner driver…". One click installs the pkg, no password, and System Settings opens on Driver Extensions. After allowing, the item disappears and `systemextensionsctl list` shows the dext activated.
 - [ ] (this Mac) With Karabiner-Elements present, no driver items are shown and `DaemonStatus.driver.vhidDaemonManagedByBarnata` is false.
-- [ ] Grant Input Monitoring reveals `/Applications/Barnata.app/Contents/MacOS/kanata` in Finder and opens the pane. Same for Accessibility.
+- [ ] Grant Input Monitoring shows the system prompt on a fresh Mac. The pane lists `Barnata` with its icon, not `kanata` or `barnata-daemon`. Same for Accessibility.
+- [ ] Once granted, both Setup items disappear and the autorun preset starts within 5 s without relaunching the app.
+- [ ] `log show --predicate 'process == "tccd"'` shows `subject=io.jackyluong.barnata` for a request from `io.jackyluong.barnata.kanata`.
+- [ ] If no `Barnata` row appears under Input Monitoring, `tccutil reset ListenEvent io.jackyluong.barnata` clears a cached silent denial from a uid 0 request. Never a global `tccutil reset`.
 - [ ] After grants, the autorun preset starts and the keyboard is remapped. No password prompt.
 
 Running

@@ -14,7 +14,7 @@ DRIVER_VERSION="6.8.0"
 DRIVER_PKG_URL="https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVER_VERSION}/Karabiner-DriverKit-VirtualHIDDevice-${DRIVER_VERSION}.pkg"
 
 # swift test needs XCTest and the swift-testing macro plugin, neither of which ships with Command Line Tools
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-beta.app/Contents/Developer}"
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
 # BASH_SOURCE is bash-only; $0 covers zsh
 VARS_SELF="${BASH_SOURCE[0]:-$0}"
