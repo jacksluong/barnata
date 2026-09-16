@@ -24,6 +24,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private var didRunUpdateFlow = false
     private var isRestartingDaemonForUpdate = false
     private var didAttemptAutostart = false
+    private var isStoppingKanataForQuit = false
     private var didCheckKanataVersion = false
     private var presetToStartAfterUpdate: String?
 
@@ -57,6 +58,17 @@ public final class AppController: NSObject, NSApplicationDelegate {
         daemonClient.start()
         loadBundledKanataVersion()
         render()
+    }
+
+    /// Quitting always stops kanata, so the keyboard is never left remapped by an absent app
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isStoppingKanataForQuit else { return .terminateNow }
+        isStoppingKanataForQuit = true
+        daemonClient.stopKanata(onMain { result in
+            if !result.ok { log.error("stop kanata on quit failed: \(result.message ?? "", privacy: .public)") }
+            NSApp.reply(toApplicationShouldTerminate: true)
+        })
+        return .terminateLater
     }
 
     public func applicationWillTerminate(_ notification: Notification) {
@@ -150,8 +162,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private func autostartIfNeeded(_ status: DaemonStatus) {
         // Starting into a daemon that is about to be shut down for the update just fails
         guard !didAttemptAutostart, state.daemonApproved, !isRestartingDaemonForUpdate else { return }
-        // kanata exits 1 on every attempt without the grants, so wait for them rather than churn
-        guard state.missingPermissions.isEmpty else { return }
+        // kanata exits 1 on every attempt without the grant, so wait for it rather than churn
+        guard state.missingPermission == nil else { return }
         didAttemptAutostart = true
 
         guard status.state == .idle else { return }
@@ -188,7 +200,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
             state.lastReloadError = nil
         case .message(let message):
             apply(message)
-        case .disconnected, .gaveUp:
+        case .disconnected:
             clearLayers()
         }
         render()
@@ -283,18 +295,17 @@ public final class AppController: NSObject, NSApplicationDelegate {
         let approvalChanged = approved != state.daemonApproved
         state.daemonApproved = approved
 
-        let hadPermissions = state.missingPermissions.isEmpty
-        state.hasInputMonitoring = setup.inputMonitoring.isGranted
+        let hadPermission = state.missingPermission == nil
         state.hasAccessibility = setup.hasAccessibility
 
         if approvalChanged { daemonClient.reconnect() }
         // A grant that just landed is the reason kanata was crashing, so try it again
-        if !hadPermissions, state.missingPermissions.isEmpty, state.state != .running {
+        if !hadPermission, state.missingPermission == nil, state.state != .running {
             didAttemptAutostart = false
             refreshStatus()
         }
 
-        if approved, state.missingPermissions.isEmpty {
+        if approved, state.missingPermission == nil {
             setupTimer?.invalidate()
             setupTimer = nil
         } else if setupTimer == nil {
@@ -360,9 +371,6 @@ public final class AppController: NSObject, NSApplicationDelegate {
         case .openKanataLog:
             setup.open(AppBundle.kanataLogURL)
 
-        case .openAppLog:
-            setup.openConsoleForSubsystem()
-
         case .approveDaemon:
             setup.registerDaemon()
             setup.openLoginItems()
@@ -382,13 +390,9 @@ public final class AppController: NSObject, NSApplicationDelegate {
                 if result.ok { setup.openDriverExtensions() }
             })
 
-        case .grantInputMonitoring:
+        case .grantAccessibility:
             // The request is what puts Barnata in the pane, so always make it, then send
             // the user to the toggle. When the state is undetermined it also prompts.
-            setup.requestInputMonitoring()
-            if !setup.inputMonitoring.isGranted { setup.openInputMonitoring() }
-
-        case .grantAccessibility:
             setup.requestAccessibility()
             if !setup.hasAccessibility { setup.openAccessibility() }
 
@@ -411,10 +415,6 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
         case .quit:
             NSApp.terminate(nil)
-
-        case .quitAndStopKanata:
-            daemonClient.stopKanata(onMain { _ in NSApp.terminate(nil) })
-            return
         }
         render()
     }

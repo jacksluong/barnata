@@ -12,16 +12,13 @@ public enum MenuAction: Sendable, Hashable {
     case previousConfigFile
     case openConfigFile
     case openKanataLog
-    case openAppLog
     case approveDaemon
     case installDriver
     case activateDriver
-    case grantInputMonitoring
     case grantAccessibility
     case toggleLaunchAtLogin
     case toggleShowDockIcon
     case quit
-    case quitAndStopKanata
 }
 
 public struct MenuItem: Sendable, Equatable {

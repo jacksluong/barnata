@@ -6,6 +6,8 @@ import Foundation
 @MainActor
 public final class StatusItemController: NSObject, NSMenuDelegate {
     public static let spinnerDelay: TimeInterval = 0.4
+    /// The small indeterminate indicator draws at this size; the square item supplies the padding
+    public static let spinnerSize: CGFloat = 16
 
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
@@ -26,7 +28,8 @@ public final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     public override init() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // A square item keeps the width fixed, whatever icon or spinner sits in it
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         super.init()
         menu.delegate = self
         statusItem.menu = menu
@@ -120,7 +123,7 @@ public final class StatusItemController: NSObject, NSMenuDelegate {
         spinnerTimer = nil
         guard spinner == nil, let button = statusItem.button else { return }
 
-        let indicator = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: 16, height: 16))
+        let indicator = NSProgressIndicator(frame: NSRect(x: 0, y: 0, width: StatusItemController.spinnerSize, height: StatusItemController.spinnerSize))
         indicator.style = .spinning
         indicator.controlSize = .small
         indicator.isIndeterminate = true
@@ -130,8 +133,8 @@ public final class StatusItemController: NSObject, NSMenuDelegate {
         NSLayoutConstraint.activate([
             indicator.centerXAnchor.constraint(equalTo: button.centerXAnchor),
             indicator.centerYAnchor.constraint(equalTo: button.centerYAnchor),
-            indicator.widthAnchor.constraint(equalToConstant: 16),
-            indicator.heightAnchor.constraint(equalToConstant: 16),
+            indicator.widthAnchor.constraint(equalToConstant: StatusItemController.spinnerSize),
+            indicator.heightAnchor.constraint(equalToConstant: StatusItemController.spinnerSize),
         ])
         indicator.startAnimation(nil)
         spinner = indicator

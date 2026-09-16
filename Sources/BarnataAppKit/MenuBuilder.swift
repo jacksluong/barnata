@@ -13,8 +13,8 @@ public enum MenuBuilder {
         entries.append(contentsOf: files(state))
         entries.append(.submenu(MenuItem(title: "Setup"), setup(state)))
         entries.append(.separator)
-        entries.append(.item(MenuItem(title: "Quit Barnata", action: .quit, keyEquivalent: "q")))
-        entries.append(.item(MenuItem(title: "Quit and stop kanata", action: .quitAndStopKanata)))
+        // Quitting always stops kanata, so no shortcut that could be hit by accident
+        entries.append(.item(MenuItem(title: "Quit Barnata", action: .quit)))
         return entries
     }
 
@@ -78,7 +78,6 @@ public enum MenuBuilder {
         [
             .item(MenuItem(title: "Open config file", action: .openConfigFile)),
             .item(MenuItem(title: "Open kanata log", action: .openKanataLog)),
-            .item(MenuItem(title: "Open Barnata log", action: .openAppLog)),
         ]
     }
 
@@ -96,12 +95,6 @@ public enum MenuBuilder {
             }
         }
 
-        if !state.hasInputMonitoring {
-            entries.append(.item(MenuItem(
-                title: "Grant \(SystemPaneNames.inputMonitoring)…",
-                action: .grantInputMonitoring
-            )))
-        }
         if !state.hasAccessibility {
             entries.append(.item(MenuItem(
                 title: "Grant \(SystemPaneNames.accessibility)…",

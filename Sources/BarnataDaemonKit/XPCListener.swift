@@ -7,6 +7,7 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
     private static let idleCheckInterval: TimeInterval = 5
 
     private let listener: NSXPCListener
+    private let kanataPath: String
     private let clientRequirement: String?
     private let service: DaemonService
     private let queue = DispatchQueue(label: "io.jackyluong.barnata.listener")
@@ -19,6 +20,7 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
 
     public init(layout: BundleLayout, machServiceName: String) {
         self.listener = NSXPCListener(machServiceName: machServiceName)
+        self.kanataPath = layout.kanataURL.path
 
         let teamID = SignatureCheck.selfTeamIdentifier()
         self.clientRequirement = teamID.map {
@@ -68,6 +70,7 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
             log.error("this daemon has no team identifier, every XPC connection will be refused")
         }
         installSignalHandlers()
+        reapStrayKanata()
         startIdleTimer()
         listener.resume()
         dispatchMain()
@@ -75,6 +78,14 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
 
     public func noteActivity() {
         queue.async { self.idleSince = nil }
+    }
+
+    /// A daemon that died before its child did leaves a kanata holding the keyboard and the TCP port
+    private func reapStrayKanata() {
+        for pid in StrayProcesses.pids(forExecutable: kanataPath) {
+            log.error("killing a stray kanata left by an earlier daemon, pid \(pid)")
+            kill(pid, SIGKILL)
+        }
     }
 
     // MARK: - NSXPCListenerDelegate

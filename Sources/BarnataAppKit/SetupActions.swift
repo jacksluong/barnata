@@ -2,25 +2,13 @@ import AppKit
 import ApplicationServices
 import BarnataCore
 import Foundation
-import IOKit.hid
 import ServiceManagement
-
-/// What TCC currently records for a permission. `denied` means asking again shows no prompt.
-public enum PermissionState: Sendable, Equatable {
-    case granted
-    case denied
-    case undetermined
-
-    public var isGranted: Bool { self == .granted }
-}
 
 /// Every jump into System Settings and every SMAppService call the Setup menu makes
 @MainActor
 public struct SetupActions {
     public static let daemonPlistName = "\(barnataDaemonIdentifier).plist"
 
-    private static let inputMonitoringURL = URL(
-        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent")!
     private static let accessibilityURL = URL(
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
     private static let driverExtensionsURL = URL(
@@ -75,33 +63,15 @@ public struct SetupActions {
     // MARK: - Privacy permissions
 
     /// tccd resolves kanata's request to the enclosing app bundle, so one grant covers both
-    public var inputMonitoring: PermissionState {
-        switch IOHIDCheckAccess(kIOHIDRequestTypeListenEvent) {
-        case kIOHIDAccessTypeGranted: .granted
-        case kIOHIDAccessTypeDenied: .denied
-        default: .undetermined
-        }
-    }
-
     public var hasAccessibility: Bool { AXIsProcessTrusted() }
 
-    /// Shows the system prompt and registers Barnata in the Input Monitoring pane.
+    /// Shows the system prompt and registers Barnata in the pane.
     /// kanata cannot do this itself: tccd refuses to draw UI for a uid 0 requester.
-    @discardableResult
-    public func requestInputMonitoring() -> Bool {
-        IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
-    }
-
     @discardableResult
     public func requestAccessibility() -> Bool {
         // The imported kAXTrustedCheckOptionPrompt global is not Sendable; its value is this string
         let options = ["AXTrustedCheckOptionPrompt" as CFString: true] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
-    }
-
-    public func openInputMonitoring() {
-        revealAppInFinder()
-        NSWorkspace.shared.open(SetupActions.inputMonitoringURL)
     }
 
     public func openAccessibility() {
@@ -123,10 +93,6 @@ public struct SetupActions {
 
     public func open(_ url: URL) {
         NSWorkspace.shared.open(url)
-    }
-
-    public func openConsoleForSubsystem() {
-        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Utilities/Console.app"))
     }
 }
 

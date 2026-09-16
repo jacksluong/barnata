@@ -181,21 +181,24 @@ Subscription: the app hands the daemon an anonymous listener endpoint. The daemo
 
   Fallback if the symbol is missing or returns non-zero: spawn without it and report `responsibilityDisclaimed = false` in the log. In that case the grant attaches to `barnata-daemon` instead.
 
-  With the disclaim in place, kanata is responsible for itself, and tccd resolves it up to the enclosing bundle. Confirmed from a live `tccd` log: a request from `io.jackyluong.barnata.kanata` produces `subject=io.jackyluong.barnata` at `/Applications/Barnata.app`. So Input Monitoring and Accessibility are granted once, to the app, and the pane shows `Barnata` with its icon. Neither `kanata` nor `barnata-daemon` appears.
+  With the disclaim in place, kanata is responsible for itself, and tccd resolves it up to the enclosing bundle. Confirmed from a live `tccd` log: a request from `io.jackyluong.barnata.kanata` produces `subject=io.jackyluong.barnata` at `/Applications/Barnata.app`. So the grant is made once, to the app, and the pane shows `Barnata` with its icon. Neither `kanata` nor `barnata-daemon` appears.
 
-  kanata cannot raise the prompt itself: tccd logs `notifyUserOfDeniedAccessBy ... fails when requestor has UID 0` and denies silently. The app calls `IOHIDRequestAccess` and `AXIsProcessTrustedWithOptions` instead, which resolve to the same subject.
+  kanata cannot raise the prompt itself: tccd logs `notifyUserOfDeniedAccessBy ... fails when requestor has UID 0` and denies silently. The app calls `AXIsProcessTrustedWithOptions` instead, which resolves to the same subject.
 
-  Two findings from the first install on macOS 27:
+  Accessibility is the only grant Barnata asks for. It covers Input Monitoring as well. Measured on macOS 27: tccd has written only `kTCCServiceAccessibility` records for `io.jackyluong.barnata`, yet kanata's `kTCCServiceListenEvent` check answers `authValue=2` with `subject=io.jackyluong.barnata`, and it still answers `2` straight after `tccutil reset ListenEvent io.jackyluong.barnata`. No `Barnata` row appears under Input Monitoring because no Input Monitoring record exists. Before the Accessibility grant, kanata exited 1 with `kanata needs macOS Input Monitoring permission`; after it, kanata logs `keyboard grabbed`.
 
-  - The silent root-side denial is cached. Once recorded, `IOHIDCheckAccess` returns `denied`, the prompt never appears again, and no row shows up in Input Monitoring. `tccutil reset ListenEvent io.jackyluong.barnata` clears that one entry and the grant then goes through. The app avoids creating the stale denial in the first place by refusing to autostart while a grant is missing, so kanata never runs and never asks from uid 0.
+  Related findings:
+
+  - The silent root-side denial is cached. Once recorded, `IOHIDCheckAccess` returns `denied` and the prompt never appears again. `tccutil reset ListenEvent io.jackyluong.barnata` clears that one entry. The app avoids creating the stale denial in the first place by refusing to autostart while the grant is missing, so kanata never runs and never asks from uid 0.
   - macOS 27 renamed the Accessibility pane to Device Control and Data Access. `SystemPaneNames` in `BarnataAppKit` picks the label at runtime from `ProcessInfo.isOperatingSystemAtLeast`, so the menu matches the pane on both macOS 14 and 27.
+  - An app-side `IOHIDRequestAccess` on the unnotarized debug build is answered with `Refusing TCCAccessRequest for service kTCCServiceListenEvent ... due to security policy`. The app no longer makes that call.
 
-  Unresolved: an app-side `IOHIDRequestAccess` on the unnotarized debug build is answered with `Refusing TCCAccessRequest for service kTCCServiceListenEvent ... due to security policy`, and only the Device Control grant plus the reset made kanata work. Re-run the fresh-install checks against a notarized build in Phase 5 before assuming the Input Monitoring prompt works for a new user.
+  Unverified below macOS 27: whether Accessibility implies Input Monitoring on macOS 14 through 26. The Setup submenu is driven by a runtime `AXIsProcessTrusted` check, so a system that needs a separate grant still shows kanata's own error in the title line.
 - `stop` sends SIGTERM, waits 3 s, then SIGKILL. `stop` also stops the Barnata-managed virtual HID daemon.
 - State after exit is decided by the exit code: non-zero sets `crashed`, zero sets `idle`. kanata emergency exit (LCtrl+Space+Esc) exits with code 0.
 - With `autorestartOnCrash`, a `crashed` exit restarts with backoff (1 s, 2 s, 4 s, 8 s, cap 30 s). The daemon gives up after 5 restarts inside 2 minutes and stays `crashed`.
-- On daemon exit for any reason, all children get SIGTERM.
-- Single instance: `start` while running stops the current kanata first.
+- On daemon exit for any reason, all children get SIGTERM, then SIGKILL if they are still alive. The exit blocks until they are gone: kanata does not always act on SIGTERM, and exiting first leaves it holding the keyboard and the TCP port.
+- Single instance: `start` while running stops the current kanata first. At startup the daemon also kills any process running its own bundled kanata path, which reaps a child an earlier daemon left behind.
 - The `ProcessSupervisor` takes a `Spawner` protocol so the backoff policy is testable without spawning.
 
 ## Karabiner virtual HID driver
@@ -240,6 +243,8 @@ Status item icon reflects, in priority order: daemon not approved, driver missin
 
 While state is `starting` or `stopping` for longer than 400 ms, the status item shows an `NSProgressIndicator` with `style = .spinning` in place of the icon. Shorter transitions keep the previous icon.
 
+The status item uses `NSStatusItem.squareLength`, so its width never changes. Every image, bundled symbol or PNG override, is scaled to fit an 18 pt square, and the spinner is 16 pt centered in the same box.
+
 ```
 Barnata: Running (canary.kbd, layer: base)     disabled title line
 ------------------------------------------------
@@ -253,21 +258,18 @@ Stop kanata
 ------------------------------------------------
 Open config file                                  opens config.toml in the default editor
 Open kanata log
-Open Barnata log                                Console.app filtered to the subsystem
 Setup                                             submenu
   Approve background daemon…                      shown until daemon.status == .enabled
   Install Karabiner driver…                       shown when driver not installed; install, activate, open the approval pane
   Activate Karabiner driver…                      shown when installed but not activated
-  Grant Input Monitoring…                         shown until granted; prompts, or opens the pane and reveals the app
-  Grant Accessibility…                            shown until granted
+  Grant Accessibility…                            shown until granted; prompts, or opens the pane and reveals the app
   Launch at login                                 checkmark, toggles SMAppService.mainApp, writes config
   Show in Dock                                    checkmark, applies immediately, writes config
 ------------------------------------------------
-Quit Barnata                                    ⌘Q, kanata keeps running
-Quit and stop kanata
+Quit Barnata                                    no shortcut, always stops kanata first
 ```
 
-Title line variants: `Running (<config>, layer: <layer>)`, `Starting`, `Stopping`, `Not running`, `Crashed (exit <code>)`, `Running for another user`, `Daemon not approved`, `Driver not installed`, `Driver <installed> is newer than required <required>`, `Config error: <message>`, `<Input Monitoring and/or Accessibility> not granted`.
+Title line variants: `Running (<config>, layer: <layer>)`, `Starting`, `Stopping`, `Not running`, `Crashed (exit <code>)`, `Running for another user`, `Daemon not approved`, `Driver not installed`, `Driver <installed> is newer than required <required>`, `Config error: <message>`, `<Accessibility> not granted`.
 
 `Running for another user` appears when `DaemonStatus.ownerUID` differs from the app's uid. Only "Stop kanata" stays enabled in that state.
 

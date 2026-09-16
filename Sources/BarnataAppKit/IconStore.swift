@@ -5,10 +5,11 @@ import Foundation
 /// Menu bar images. Bundled status icons are SF Symbols; `app.status_icons` overrides them with files.
 @MainActor
 public final class IconStore {
-    public static let imageHeight: CGFloat = 18
+    /// Every image is fitted into this square so the status item never changes width
+    public static let imageSize: CGFloat = 18
 
     private static let symbolNames: [IconResolver.StatusIcon: String] = [
-        .normal: "keyboard",
+        .normal: "command.circle",
         .crashed: "exclamationmark.triangle.fill",
         .paused: "pause.circle",
         .reloading: "arrow.triangle.2.circlepath",
@@ -63,14 +64,16 @@ public final class IconStore {
             NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
         ) ?? image
         configured.isTemplate = true
+        resize(configured)
         cache[key] = configured
         return configured
     }
 
-    /// Menu bar images must be small; keep the aspect ratio and pin the height
+    /// Fit inside the square, so a wide icon shrinks instead of widening the status item
     private func resize(_ image: NSImage) {
-        guard image.size.height > 0, image.size.height != IconStore.imageHeight else { return }
-        let scale = IconStore.imageHeight / image.size.height
-        image.size = NSSize(width: image.size.width * scale, height: IconStore.imageHeight)
+        let longest = Swift.max(image.size.width, image.size.height)
+        guard longest > 0, longest != IconStore.imageSize else { return }
+        let scale = IconStore.imageSize / longest
+        image.size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
     }
 }

@@ -58,6 +58,8 @@ final class FakeSpawner: Spawner, @unchecked Sendable {
     private var recordedSpawns: [SpawnRequest] = []
     private var recordedSignals: [(signal: Int32, pid: pid_t)] = []
     var spawnError: SpawnError?
+    /// When set, the child exits on the first signal, the way a well behaved process does
+    var exitsOnSignal: Bool = false
 
     var spawnRequests: [SpawnRequest] { lock.withLock { recordedSpawns } }
     var signals: [(signal: Int32, pid: pid_t)] { lock.withLock { recordedSignals } }
@@ -74,10 +76,16 @@ final class FakeSpawner: Spawner, @unchecked Sendable {
 
     func signal(_ signal: Int32, to pid: pid_t) {
         lock.withLock { recordedSignals.append((signal, pid)) }
+        guard exitsOnSignal else { return }
+        exit(pid: pid, reason: .exited(code: 0))
     }
 
     func wait(for pid: pid_t, completion: @escaping @Sendable (ExitReason) -> Void) {
         lock.withLock { waiters[pid] = completion }
+    }
+
+    func isRunning(_ pid: pid_t) -> Bool {
+        lock.withLock { waiters[pid] != nil }
     }
 
     /// Delivers an exit to the supervisor, the way waitpid would

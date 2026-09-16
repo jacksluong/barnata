@@ -117,14 +117,32 @@ public final class ProcessSupervisor: @unchecked Sendable {
         }
     }
 
-    /// SIGTERM without waiting, for daemon exit
-    public func terminateNow() {
-        queue.sync {
+    /// For daemon exit: SIGTERM, then SIGKILL, blocking until the child is really gone.
+    /// kanata does not always act on SIGTERM, and an exit that leaves it behind orphans it.
+    public func terminateNow(grace: TimeInterval = 2) {
+        let pid: pid_t? = queue.sync {
             pendingStart = nil
-            guard let pid = currentPID else { return }
+            guard let pid = currentPID else { return nil }
             stoppingOnPurpose = true
             spawner.signal(SIGTERM, to: pid)
+            return pid
         }
+        guard let pid, !waitForExit(of: pid, within: grace) else { return }
+
+        log.error("\(self.configuration.executablePath, privacy: .public) ignored SIGTERM on exit, sending SIGKILL")
+        spawner.signal(SIGKILL, to: pid)
+        if !waitForExit(of: pid, within: 1) {
+            log.error("pid \(pid) survived SIGKILL")
+        }
+    }
+
+    private func waitForExit(of pid: pid_t, within timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            guard spawner.isRunning(pid) else { return true }
+            usleep(50_000)
+        }
+        return !spawner.isRunning(pid)
     }
 
     // MARK: - Queue-confined internals

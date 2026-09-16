@@ -69,6 +69,10 @@ public struct PosixSpawner: Spawner {
         kill(pid, signal)
     }
 
+    public func isRunning(_ pid: pid_t) -> Bool {
+        kill(pid, 0) == 0
+    }
+
     public func wait(for pid: pid_t, completion: @escaping @Sendable (ExitReason) -> Void) {
         DispatchQueue.global(qos: .utility).async {
             var status: Int32 = 0

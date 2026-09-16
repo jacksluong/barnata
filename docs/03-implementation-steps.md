@@ -36,7 +36,8 @@ Targets: `BarnataDaemonKit` (library) and `BarnataDaemonKitTests`. `barnata-daem
 
 - `XPCListener`: `NSXPCListener(machServiceName:)`, `setCodeSigningRequirement` on each incoming connection, idle-exit timer (60 s with no kanata child and no clients), `shutdown` handling.
 - `Spawner` protocol with a `PosixSpawner` implementation (spawn, signal, wait, stdout/stderr capture, TCC responsibility disclaim).
-- `ProcessSupervisor`: start, stop, restart, crash state from exit code, `BackoffPolicy`, stderr tail for `lastError`, log redirection with rotation.
+- `ProcessSupervisor`: start, stop, restart, crash state from exit code, `BackoffPolicy`, stderr tail for `lastError`, log redirection with rotation, a blocking `terminateNow` that escalates to SIGKILL so daemon exit never orphans kanata.
+- `StrayProcesses`: `proc_listpids` lookup by executable path, used at daemon start to kill a kanata an earlier daemon left behind.
 - `SignatureCheck`: `SecStaticCodeCreateWithPath` + `SecRequirementCreateWithString` + `SecStaticCodeCheckValidity` helper used for kanata, the Karabiner daemon, and the Karabiner manager. `pkgutil --check-signature` wrapper for the pkg.
 - `DriverManager`: `DriverStatus` collection, `ensureVirtualHIDDaemon`, `installDriver`, `activateDriver`.
 - `RequestValidator`: enforces every rule in the privilege boundary section of `01-architecture.md`, including the uid ownership check.
@@ -72,9 +73,9 @@ Targets: `BarnataAppKit` (library) and `BarnataAppKitTests`. `Barnata/main.swift
 - `DaemonClient`: `NSXPCConnection(machServiceName:)`, reconnect with backoff, `subscribe` with an anonymous listener.
 - `KanataTCPClient`: `NWConnection` to `127.0.0.1:<port>`, line framing, message enum, reconnect logic.
 - `MenuState` and `MenuBuilder`: value type to `[MenuEntry]` tree, no AppKit imports.
-- `StatusItemController`: renders `[MenuEntry]` into `NSMenu`, icon priority rules, template icon detection, 2 s reload flash, 400 ms delayed spinner for `starting` and `stopping`.
-- `IconStore`: bundled status icons are SF Symbols (`keyboard`, `exclamationmark.triangle.fill`, `pause.circle`, `arrow.triangle.2.circlepath`), so no image assets are committed. `app.status_icons` still overrides them with PNGs from the config directory through `IconResolver`.
-- `SetupActions`: `SMAppService.daemon` register and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent`, `?Privacy_Accessibility`, and the Driver Extensions pane, `NSWorkspace.activateFileViewerSelecting` on the app bundle. `IOHIDCheckAccess`/`IOHIDRequestAccess` and `AXIsProcessTrusted`/`AXIsProcessTrustedWithOptions` read and request the two privacy grants from the app, which is the only side that can show the prompt.
+- `StatusItemController`: renders `[MenuEntry]` into `NSMenu`, icon priority rules, template icon detection, 2 s reload flash, 400 ms delayed spinner for `starting` and `stopping`, `NSStatusItem.squareLength` so the width never changes.
+- `IconStore`: bundled status icons are SF Symbols (`command.circle`, `exclamationmark.triangle.fill`, `pause.circle`, `arrow.triangle.2.circlepath`), so no image assets are committed. `app.status_icons` still overrides them with PNGs from the config directory through `IconResolver`.
+- `SetupActions`: `SMAppService.daemon` register and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` and the Driver Extensions pane, `NSWorkspace.activateFileViewerSelecting` on the app bundle. `AXIsProcessTrusted`/`AXIsProcessTrustedWithOptions` read and request the one privacy grant from the app, which is the only side that can show the prompt.
 - `show_dock_icon`: `Info.plist` has `LSUIElement = true`; `true` in config calls `NSApp.setActivationPolicy(.regular)` at launch and on toggle.
 - App entitlements: none. Hardened runtime on. No sandbox.
 
@@ -94,8 +95,9 @@ Carried over from Phase 3, now that the app can register the daemon:
 Phase 4 proper:
 
 - `swift test` passes.
-- Fresh install flow on this machine: launch, approve daemon once with password, grant Input Monitoring and Accessibility to the bundled kanata, autorun preset starts, layer icon changes when switching layers on the keyboard.
-- Quit the app; typing still remapped. Relaunch; menu shows Running and the current layer without restarting kanata.
+- Fresh install flow on this machine: launch, approve daemon once with password, grant Accessibility to the app, autorun preset starts, layer icon changes when switching layers on the keyboard.
+- Quit the app; kanata stops and typing is no longer remapped. Relaunch; the autorun preset starts again.
+- Stop kanata and start the preset again five times over; the Layers submenu and the layer icon come back every time.
 - Edit `canary.kbd`, choose Reload config, `ConfigFileReload` arrives and the icon flashes.
 - Set `show_dock_icon = true` in the file, the Dock icon appears within a second. Set it back, it disappears. Toggle it from the menu, the file changes and the watcher does not reload twice.
 - Toggle Launch at login, the app appears under System Settings > Login Items.

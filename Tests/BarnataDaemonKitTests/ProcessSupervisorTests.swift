@@ -161,6 +161,26 @@ final class ProcessSupervisorTests: XCTestCase {
         XCTAssertEqual(result.message, "no preset has been started yet")
     }
 
+    /// Daemon exit used to send SIGTERM and leave, orphaning a kanata that ignores it
+    func testTerminateNowKillsAChildThatIgnoresSIGTERM() {
+        supervisor.start(makeRequest())
+        let pid = spawner.lastPID
+
+        supervisor.terminateNow(grace: 0.1)
+
+        XCTAssertEqual(spawner.signals.map(\.signal), [SIGTERM, SIGKILL])
+        XCTAssertEqual(spawner.signals.map(\.pid), [pid, pid])
+    }
+
+    func testTerminateNowSendsNoSIGKILLWhenTheChildGoesQuietly() {
+        supervisor.start(makeRequest())
+        spawner.exitsOnSignal = true
+
+        supervisor.terminateNow(grace: 1)
+
+        XCTAssertEqual(spawner.signals.map(\.signal), [SIGTERM])
+    }
+
     func testStopWhenNothingRunsSucceeds() {
         let result = supervisor.stop()
         XCTAssertTrue(result.ok)

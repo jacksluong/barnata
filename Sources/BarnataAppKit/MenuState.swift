@@ -3,8 +3,6 @@ import Foundation
 
 /// System Settings pane names, which Apple has changed across releases
 public enum SystemPaneNames {
-    public static let inputMonitoring = "Input Monitoring"
-
     /// macOS 27 renamed the Accessibility pane to Device Control and Data Access
     public static var accessibility: String {
         let macOS27 = OperatingSystemVersion(majorVersion: 27, minorVersion: 0, patchVersion: 0)
@@ -24,7 +22,6 @@ public enum StatusPresentation: Sendable, Equatable {
 public struct MenuState: Sendable, Equatable {
     public var appVersion: String
     public var daemonApproved: Bool
-    public var hasInputMonitoring: Bool
     public var hasAccessibility: Bool
     public var configPath: String
     public var configError: String?
@@ -43,7 +40,6 @@ public struct MenuState: Sendable, Equatable {
     public init(
         appVersion: String = "0",
         daemonApproved: Bool = false,
-        hasInputMonitoring: Bool = true,
         hasAccessibility: Bool = true,
         configPath: String = "",
         configError: String? = nil,
@@ -61,7 +57,6 @@ public struct MenuState: Sendable, Equatable {
     ) {
         self.appVersion = appVersion
         self.daemonApproved = daemonApproved
-        self.hasInputMonitoring = hasInputMonitoring
         self.hasAccessibility = hasAccessibility
         self.configPath = configPath
         self.configError = configError
@@ -104,12 +99,9 @@ public struct MenuState: Sendable, Equatable {
         return (installed, driver.requiredVersion)
     }
 
-    /// Privacy permissions kanata cannot start without, named as System Settings names them
-    public var missingPermissions: [String] {
-        var missing: [String] = []
-        if !hasInputMonitoring { missing.append(SystemPaneNames.inputMonitoring) }
-        if !hasAccessibility { missing.append(SystemPaneNames.accessibility) }
-        return missing
+    /// The grant kanata cannot start without, named as System Settings names it
+    public var missingPermission: String? {
+        hasAccessibility ? nil : SystemPaneNames.accessibility
     }
 
     /// Kanata control items are dead while the daemon is unapproved or another user owns the process
@@ -124,8 +116,8 @@ public struct MenuState: Sendable, Equatable {
         if let driver, !driver.installed { return "Driver not installed" }
         if isRunningForAnotherUser { return "Running for another user" }
         // A missing grant is why kanata keeps exiting, so say that instead of the exit code
-        if !missingPermissions.isEmpty, state == .idle || state == .crashed {
-            return "\(missingPermissions.joined(separator: " and ")) not granted"
+        if let missingPermission, state == .idle || state == .crashed {
+            return "\(missingPermission) not granted"
         }
 
         switch state {
@@ -160,7 +152,7 @@ public struct MenuState: Sendable, Equatable {
         if !daemonApproved { return .status(.crashed) }
         if configError != nil { return .status(.crashed) }
         if let driver, !driver.installed { return .status(.crashed) }
-        if !missingPermissions.isEmpty, state != .running { return .status(.crashed) }
+        if missingPermission != nil, state != .running { return .status(.crashed) }
         if state == .crashed { return .status(.crashed) }
         if state == .idle { return .status(.paused) }
         if isReloading { return .status(.reloading) }

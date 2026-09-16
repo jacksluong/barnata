@@ -45,15 +45,16 @@ First launch
 - [ ] After approval the item disappears within 5 s without relaunching the app.
 - [ ] Setup shows "Install Karabiner driver…". One click installs the pkg, no password, and System Settings opens on Driver Extensions. After allowing, the item disappears and `systemextensionsctl list` shows the dext activated.
 - [ ] (this Mac) With Karabiner-Elements present, no driver items are shown and `DaemonStatus.driver.vhidDaemonManagedByBarnata` is false.
-- [ ] Grant Input Monitoring shows the system prompt on a fresh Mac. The pane lists `Barnata` with its icon, not `kanata` or `barnata-daemon`. Same for Accessibility.
-- [ ] Once granted, both Setup items disappear and the autorun preset starts within 5 s without relaunching the app.
-- [ ] `log show --predicate 'process == "tccd"'` shows `subject=io.jackyluong.barnata` for a request from `io.jackyluong.barnata.kanata`.
-- [ ] If no `Barnata` row appears under Input Monitoring, `tccutil reset ListenEvent io.jackyluong.barnata` clears a cached silent denial from a uid 0 request. Never a global `tccutil reset`.
-- [ ] After grants, the autorun preset starts and the keyboard is remapped. No password prompt.
+- [ ] Grant Accessibility shows the system prompt on a fresh Mac. The pane lists `Barnata` with its icon, not `kanata` or `barnata-daemon`.
+- [ ] Once granted, the Setup item disappears and the autorun preset starts within 5 s without relaunching the app.
+- [ ] `log show --predicate 'process == "tccd"'` shows `subject=io.jackyluong.barnata` for a `kTCCServiceListenEvent` request from `io.jackyluong.barnata.kanata`, answered `authValue=2`, with no Barnata row in the Input Monitoring pane.
+- [ ] If kanata still exits 1 with the Input Monitoring message, `tccutil reset ListenEvent io.jackyluong.barnata` clears a cached silent denial from a uid 0 request. Never a global `tccutil reset`.
+- [ ] After the grant, the autorun preset starts and the keyboard is remapped. No password prompt.
 
 Running
 
 - [ ] Layers submenu lists all layers from `RequestLayerNames`. The current one has a checkmark.
+- [ ] The status item never changes width: during start, during the stop spinner, and across every layer icon.
 - [ ] Holding a layer key changes the menu bar icon to that layer's icon and back.
 - [ ] Choosing a layer in the submenu switches to it.
 - [ ] Reload config after editing the `.kbd` file applies the change, the icon flashes reloading.
@@ -68,9 +69,10 @@ Running
 
 App lifecycle
 
-- [ ] Quit Barnata. Remapping continues. `barnata-daemon` and `kanata` are still running.
-- [ ] Relaunch. Menu shows Running with the right preset and layer within 2 s. kanata pid unchanged.
-- [ ] Quit and stop kanata. Remapping ends. The daemon exits within 60 s.
+- [ ] Quit Barnata, by the menu item and by `killall Barnata`. Both stop kanata and remapping ends. The daemon exits within 60 s.
+- [ ] After any daemon restart, `ps -axo pid,command | grep MacOS/kanata` lists exactly one kanata.
+- [ ] Relaunch. The autorun preset starts and the menu shows Running with the right preset and layer within 5 s.
+- [ ] Stop kanata and start the preset again five times over. The Layers submenu, the layer checkmark, and the layer icon return every time.
 - [ ] Launch at login toggle is reflected in System Settings > Login Items and `launch_at_login` changes in `config.toml` with comments intact. Reboot: app is present, kanata starts without any prompt.
 - [ ] Config file watcher: edit `config.toml`, the menu rebuilds. Break it, error shown, fix it, recovered.
 - [ ] `show_dock_icon = true` in the file adds the Dock icon at once. `false` removes it. The menu toggle writes the file and the app log shows one reload, not two.
@@ -91,4 +93,4 @@ Update
 
 Uninstall
 
-- [ ] Quit and stop kanata, delete `/Applications/Barnata.app`. `launchctl print system/io.jackyluong.barnata.daemon` reports not found after the next login.
+- [ ] Quit Barnata, delete `/Applications/Barnata.app`. `launchctl print system/io.jackyluong.barnata.daemon` reports not found after the next login.

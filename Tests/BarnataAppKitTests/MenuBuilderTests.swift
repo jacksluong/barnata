@@ -36,27 +36,19 @@ final class MenuTitleTests: XCTestCase {
 
     func testAMissingGrantIsNamedInsteadOfTheExitCode() {
         var idle = readyState()
-        idle.hasInputMonitoring = false
-        XCTAssertEqual(idle.title, "\(SystemPaneNames.inputMonitoring) not granted")
+        idle.hasAccessibility = false
+        XCTAssertEqual(idle.title, "\(SystemPaneNames.accessibility) not granted")
         XCTAssertEqual(idle.presentation, .status(.crashed))
 
         // kanata exits 1 when the grant is missing; the exit code explains nothing
         var crashed = readyState(status: daemonStatus(state: .crashed, lastExitCode: 1))
-        crashed.hasInputMonitoring = false
         crashed.hasAccessibility = false
-        XCTAssertEqual(
-            crashed.title,
-            "\(SystemPaneNames.inputMonitoring) and \(SystemPaneNames.accessibility) not granted"
-        )
-
-        var accessibilityOnly = readyState()
-        accessibilityOnly.hasAccessibility = false
-        XCTAssertEqual(accessibilityOnly.title, "\(SystemPaneNames.accessibility) not granted")
+        XCTAssertEqual(crashed.title, "\(SystemPaneNames.accessibility) not granted")
     }
 
     func testARunningKanataOutranksAStaleMissingGrant() {
         var running = runningState()
-        running.hasInputMonitoring = false
+        running.hasAccessibility = false
         XCTAssertEqual(running.title, "Running (canary.kbd, layer: base)")
         XCTAssertEqual(running.presentation, .layer("base"))
     }
@@ -64,11 +56,11 @@ final class MenuTitleTests: XCTestCase {
     func testTheDaemonAndDriverStillOutrankAMissingGrant() {
         var unapproved = readyState()
         unapproved.daemonApproved = false
-        unapproved.hasInputMonitoring = false
+        unapproved.hasAccessibility = false
         XCTAssertEqual(unapproved.title, "Daemon not approved")
 
         var noDriver = readyState(status: daemonStatus(driver: driverStatus(installed: false, version: nil)))
-        noDriver.hasInputMonitoring = false
+        noDriver.hasAccessibility = false
         XCTAssertEqual(noDriver.title, "Driver not installed")
     }
 
@@ -193,11 +185,17 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(MenuBuilder.entries(for: state).item(titled: "No presets in config.toml")?.isEnabled, false)
     }
 
-    func testTheReloadAndQuitKeyEquivalents() {
+    func testReloadKeepsItsShortcutAndQuitHasNone() {
         let entries = MenuBuilder.entries(for: runningState())
         XCTAssertEqual(entries.item(titled: "Reload config")?.keyEquivalent, "r")
-        XCTAssertEqual(entries.item(titled: "Quit Barnata")?.keyEquivalent, "q")
-        XCTAssertEqual(entries.item(titled: "Quit and stop kanata")?.action, .quitAndStopKanata)
+        XCTAssertEqual(entries.item(titled: "Quit Barnata")?.keyEquivalent, "")
+        XCTAssertEqual(entries.item(titled: "Quit Barnata")?.action, .quit)
+    }
+
+    func testTheMenuOffersOneQuitAndNoAppLog() {
+        let titles = MenuBuilder.entries(for: runningState()).allItems.map(\.title)
+        XCTAssertEqual(titles.filter { $0.hasPrefix("Quit") }, ["Quit Barnata"])
+        XCTAssertFalse(titles.contains("Open Barnata log"))
     }
 }
 
@@ -240,21 +238,18 @@ final class SetupMenuTests: XCTestCase {
         XCTAssertTrue(items.contains("Show in Dock"))
     }
 
-    func testGrantItemsAppearOnlyWhileAPermissionIsMissing() {
-        let granted = setupItems(readyState())
-        XCTAssertFalse(granted.contains("Grant \(SystemPaneNames.inputMonitoring)…"))
-        XCTAssertFalse(granted.contains("Grant \(SystemPaneNames.accessibility)…"))
+    func testTheGrantItemAppearsOnlyWhileThePermissionIsMissing() {
+        XCTAssertFalse(setupItems(readyState()).contains("Grant \(SystemPaneNames.accessibility)…"))
 
-        var noInput = readyState()
-        noInput.hasInputMonitoring = false
-        XCTAssertTrue(setupItems(noInput).contains("Grant \(SystemPaneNames.inputMonitoring)…"))
-        XCTAssertFalse(setupItems(noInput).contains("Grant \(SystemPaneNames.accessibility)…"))
+        var missing = readyState()
+        missing.hasAccessibility = false
+        XCTAssertTrue(setupItems(missing).contains("Grant \(SystemPaneNames.accessibility)…"))
+    }
 
-        var neither = readyState()
-        neither.hasInputMonitoring = false
-        neither.hasAccessibility = false
-        XCTAssertTrue(setupItems(neither).contains("Grant \(SystemPaneNames.inputMonitoring)…"))
-        XCTAssertTrue(setupItems(neither).contains("Grant \(SystemPaneNames.accessibility)…"))
+    func testInputMonitoringIsNotOffered() {
+        var missing = readyState()
+        missing.hasAccessibility = false
+        XCTAssertFalse(setupItems(missing).contains { $0.localizedCaseInsensitiveContains("Input Monitoring") })
     }
 
     func testAFullyConfiguredSetupSubmenuIsJustTheTwoToggles() {

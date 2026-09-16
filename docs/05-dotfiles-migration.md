@@ -109,9 +109,8 @@ run_once_after_99-manual-steps.sh                 text updated
       1. Approve background daemon (admin password once).
       2. If shown, Install Karabiner driver. One click installs and
          activates it; allow it in the System Settings pane that opens.
-      3. Grant Input Monitoring and Grant Accessibility for the bundled
-         kanata (System Settings opens; drag the revealed binary into each
-         list, or click + and pick it).
+      3. Grant Accessibility. Clicking it shows the system prompt. It
+         covers Input Monitoring too, so there is nothing else to grant.
     Kanata starts on its own once all three are done.
 ```
 
@@ -126,7 +125,7 @@ arrows, numbers, launcher, system, navcode, modnums, nohrm). The config is
 [Barnata](https://github.com/jacksluong/barnata) runs it as a root
 launchd daemon and shows a per-layer icon in the menu bar. Presets and
 icons are in `home/dot_config/barnata/`. First launch asks for one admin
-approval and the Input Monitoring and Accessibility grants for kanata.
+approval and the Accessibility grant for the app.
 ```
 
 ## Order of operations on this machine

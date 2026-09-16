@@ -7,44 +7,45 @@ public final class KanataTCPClient: @unchecked Sendable {
         case connected
         case message(KanataServerMessage)
         case disconnected
-        case gaveUp
     }
 
     public static let host = "127.0.0.1"
     public static let retryInterval: TimeInterval = 0.25
-    public static let retryLimit: TimeInterval = 10
+    public static let slowRetryInterval: TimeInterval = 2
+    /// kanata sleeps before it binds, so the first seconds after a start are retried quickly
+    public static let fastRetryWindow: TimeInterval = 10
 
     private let queue = DispatchQueue(label: "io.jackyluong.barnata.kanata-tcp")
     private var connection: NWConnection?
-    private var port: Int?
+    private var wantedPort: Int?
     private var buffer = Data()
-    private var deadline = Date.distantPast
+    private var attemptsSince = Date.distantPast
     private var isReady = false
-    private var isStopped = true
     private var isRetryScheduled = false
     private var wantsHello = true
+    private var didLogSlowRetry = false
 
     /// Delivered on the main queue
     public var onEvent: (@Sendable (Event) -> Void)?
 
     public init() {}
 
+    /// Idempotent. Safe to call on every status update; it repairs a connection that went away.
     public func connect(port: Int) {
         queue.async {
-            guard self.port != port || self.isStopped else { return }
-            self.teardown()
-            self.isStopped = false
-            self.port = port
-            self.wantsHello = true
-            self.deadline = Date().addingTimeInterval(KanataTCPClient.retryLimit)
-            self.open()
+            if self.wantedPort != port {
+                self.wantedPort = port
+                self.wantsHello = true
+                self.restartAttempts()
+                self.teardown()
+            }
+            self.ensureConnection()
         }
     }
 
     public func disconnect() {
         queue.async {
-            self.isStopped = true
-            self.port = nil
+            self.wantedPort = nil
             self.teardown()
         }
     }
@@ -58,10 +59,21 @@ public final class KanataTCPClient: @unchecked Sendable {
         }
     }
 
+    /// Test hook: loses the socket with no retry pending, the state the old client wedged in
+    func dropConnectionLeavingNoRetry() {
+        queue.sync { teardown() }
+    }
+
     // MARK: - Queue-confined internals
 
+    /// The one place that decides whether to open a socket, so no path can leave the client idle
+    private func ensureConnection() {
+        guard wantedPort != nil, connection == nil, !isRetryScheduled else { return }
+        open()
+    }
+
     private func open() {
-        guard !isStopped, connection == nil, let port,
+        guard let port = wantedPort,
               let endpointPort = NWEndpoint.Port(rawValue: UInt16(truncatingIfNeeded: port))
         else { return }
 
@@ -75,10 +87,10 @@ public final class KanataTCPClient: @unchecked Sendable {
         self.connection = connection
 
         connection.stateUpdateHandler = { [weak self] state in
-            guard let self else { return }
+            guard let self, self.connection === connection else { return }
             switch state {
             case .ready: handleReady(connection)
-            case .failed, .waiting, .cancelled: scheduleRetry()
+            case .failed, .waiting, .cancelled: retry()
             default: break
             }
         }
@@ -86,9 +98,10 @@ public final class KanataTCPClient: @unchecked Sendable {
     }
 
     private func handleReady(_ connection: NWConnection) {
-        guard self.connection === connection, !isReady else { return }
+        guard !isReady else { return }
         isReady = true
         buffer = Data()
+        didLogSlowRetry = false
         emit(.connected)
         receive(on: connection)
         if wantsHello { send(.hello) }
@@ -104,7 +117,7 @@ public final class KanataTCPClient: @unchecked Sendable {
                 guard drainLines() else { return }
             }
             if isComplete || error != nil {
-                scheduleRetry()
+                retry()
                 return
             }
             receive(on: connection)
@@ -120,8 +133,7 @@ public final class KanataTCPClient: @unchecked Sendable {
             if line.localizedCaseInsensitiveContains(KanataServerMessage.invalidMessageMarker) {
                 log.notice("kanata rejected a message, reconnecting without Hello")
                 wantsHello = false
-                deadline = Date().addingTimeInterval(KanataTCPClient.retryLimit)
-                scheduleRetry()
+                retry()
                 return false
             }
             if let message = KanataServerMessage.decode(line: line) { emit(.message(message)) }
@@ -129,29 +141,37 @@ public final class KanataTCPClient: @unchecked Sendable {
         return true
     }
 
-    private func scheduleRetry() {
-        guard !isStopped, !isRetryScheduled else { return }
+    private func retry() {
+        guard wantedPort != nil, !isRetryScheduled else { return }
 
         if isReady {
-            // A live connection dropped, so the retry window starts over
-            deadline = Date().addingTimeInterval(KanataTCPClient.retryLimit)
+            restartAttempts()
             emit(.disconnected)
         }
         teardown()
 
-        guard Date() < deadline else {
-            log.error("gave up connecting to kanata on \(KanataTCPClient.host, privacy: .public)")
-            isStopped = true
-            emit(.gaveUp)
-            return
+        let delay: TimeInterval
+        if Date().timeIntervalSince(attemptsSince) < KanataTCPClient.fastRetryWindow {
+            delay = KanataTCPClient.retryInterval
+        } else {
+            delay = KanataTCPClient.slowRetryInterval
+            if !didLogSlowRetry {
+                didLogSlowRetry = true
+                log.notice("kanata is not answering on \(KanataTCPClient.host, privacy: .public), still retrying")
+            }
         }
 
         isRetryScheduled = true
-        queue.asyncAfter(deadline: .now() + KanataTCPClient.retryInterval) { [weak self] in
+        queue.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self else { return }
             isRetryScheduled = false
-            open()
+            ensureConnection()
         }
+    }
+
+    private func restartAttempts() {
+        attemptsSince = Date()
+        didLogSlowRetry = false
     }
 
     private func teardown() {

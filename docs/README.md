@@ -31,7 +31,7 @@ The name `Barnata`, bundle id `io.jackyluong.barnata`, and Team ID are build-tim
 - macOS only. Deployment target macOS 14. Apple silicon only (`arm64`).
 - kanata runs as root under a launchd daemon that is registered from the app bundle with `SMAppService`. No sudoers entries, no `sudo` anywhere.
 - One admin authorization at first install (approving the daemon in System Settings). Nothing asks for a password after that, including at login.
-- The menu bar app runs as the user with no privileges. Quitting it never stops kanata. Relaunching it reattaches.
+- The menu bar app runs as the user with no privileges. Quitting it stops kanata. Relaunching it reattaches to a kanata the daemon is already running.
 - The app can be a login item with no password prompt.
 - Config key `show_dock_icon` controls whether the app appears in the Dock. Default is menu bar only.
 - Presets, kanata config paths, and layer icons come from a TOML file.
@@ -52,7 +52,7 @@ Gathered on 2026-09-04 from `~/Developer/dotfiles` and the running system.
 - kanata-tray config at `~/Library/Application Support/kanata-tray/kanata-tray.toml` with one preset (`Default Preset`, autorun) and nine layer icons in `icons/`.
 - Karabiner-Elements 16.2.0 is installed. Its SMAppService-registered daemons run `Karabiner-VirtualHIDDevice-Daemon` (driver pkg 6.8.0, dext bundle version 1.8.0) as root at boot. The daemon plist lives in `/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Privileged Daemons v2.app/Contents/Library/LaunchDaemons/`.
 - kanata TCP server on port 5829 answers `Hello` with protocol 1 and capabilities `reload, layer-names, fake-key-names, layer-change, hold-activated, tap-activated, current-layer-name, current-layer-info, fake-key, set-mouse`. Layer names: `base, typing, arrows, numbers, launcher, system, navcode, modnums, nohrm`.
-- Both `kanata` and `kanata-tray` are granted Input Monitoring and Accessibility.
+- Both `kanata` and `kanata-tray` are granted Input Monitoring and Accessibility. Barnata replaces both grants with one Accessibility grant on the app bundle.
 - Toolchain: Swift 6.4, `Xcode.app` in `/Applications`, `xcode-select` points at it. `notarytool` is available.
 - One `Developer ID Application: Jacky Luong (EE3526PL64)` certificate is in the keychain. `SIGNING_IDENTITY` holds its SHA-1 hash.
 

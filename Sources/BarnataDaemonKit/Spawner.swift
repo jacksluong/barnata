@@ -58,4 +58,5 @@ public protocol Spawner: Sendable {
     func spawn(_ request: SpawnRequest) throws -> SpawnedProcess
     func signal(_ signal: Int32, to pid: pid_t)
     func wait(for pid: pid_t, completion: @escaping @Sendable (ExitReason) -> Void)
+    func isRunning(_ pid: pid_t) -> Bool
 }
