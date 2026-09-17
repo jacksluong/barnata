@@ -193,7 +193,7 @@ Subscription: the app hands the daemon an anonymous listener endpoint. The daemo
   - macOS 27 renamed the Accessibility pane to Device Control and Data Access. `SystemPaneNames` in `BarnataAppKit` picks the label at runtime from `ProcessInfo.isOperatingSystemAtLeast`, so the menu matches the pane on both macOS 14 and 27.
   - An app-side `IOHIDRequestAccess` on the unnotarized debug build is answered with `Refusing TCCAccessRequest for service kTCCServiceListenEvent ... due to security policy`. The app no longer makes that call.
 
-  Unverified below macOS 27: whether Accessibility implies Input Monitoring on macOS 14 through 26. The Setup submenu is driven by a runtime `AXIsProcessTrusted` check, so a system that needs a separate grant still shows kanata's own error in the title line.
+  Unverified below macOS 27: whether Accessibility implies Input Monitoring on macOS 14 through 26. The permission rows in the settings window are driven by a runtime `AXIsProcessTrusted` check, so a system that needs a separate grant still shows kanata's own error in the title line.
 - `stop` sends SIGTERM, waits 3 s, then SIGKILL. `stop` also stops the Barnata-managed virtual HID daemon.
 - State after exit is decided by the exit code: non-zero sets `crashed`, zero sets `idle`. kanata emergency exit (LCtrl+Space+Esc) exits with code 0.
 - With `autorestartOnCrash`, a `crashed` exit restarts with backoff (1 s, 2 s, 4 s, 8 s, cap 30 s). The daemon gives up after 5 restarts inside 2 minutes and stays `crashed`.
@@ -245,6 +245,8 @@ While state is `starting` or `stopping` for longer than 400 ms, the status item 
 
 The status item uses `NSStatusItem.squareLength`, so its width never changes. Every image, bundled symbol or PNG override, is scaled to fit an 18 pt square, and the spinner is 16 pt centered in the same box.
 
+Layer icons are SF Symbols from `IconCatalog` in `BarnataCore`. A `layer_icons` value outside that pool draws `exclamationmark.triangle.fill` in the status item and is flagged in the settings window.
+
 ```
 Barnata: Running (canary.kbd, layer: base)     disabled title line
 ------------------------------------------------
@@ -256,15 +258,8 @@ Reload config                                     ⌘R
 Restart kanata
 Stop kanata
 ------------------------------------------------
-Open config file                                  opens config.toml in the default editor
 Open kanata log
-Setup                                             submenu
-  Approve background daemon…                      shown until daemon.status == .enabled
-  Install Karabiner driver…                       shown when driver not installed; install, activate, open the approval pane
-  Activate Karabiner driver…                      shown when installed but not activated
-  Grant Accessibility…                            shown until granted; prompts, or opens the pane and reveals the app
-  Launch at login                                 checkmark, toggles SMAppService.mainApp, writes config
-  Show in Dock                                    checkmark, applies immediately, writes config
+Preferences…                                      ⌘, opens the settings window
 ------------------------------------------------
 Quit Barnata                                    no shortcut, always stops kanata first
 ```
@@ -273,11 +268,23 @@ Title line variants: `Running (<config>, layer: <layer>)`, `Starting`, `Stopping
 
 `Running for another user` appears when `DaemonStatus.ownerUID` differs from the app's uid. Only "Stop kanata" stays enabled in that state.
 
-Implementation: AppKit `NSStatusItem` and `NSMenu` built from a `MenuState` value by `MenuBuilder`, which returns a plain `[MenuEntry]` tree before any AppKit object is created. No SwiftUI windows in the first version. Icons are `NSImage` with `isTemplate` set for files whose name ends in `Template` before the extension.
+Implementation: AppKit `NSStatusItem` and `NSMenu` built from a `MenuState` value by `MenuBuilder`, which returns a plain `[MenuEntry]` tree before any AppKit object is created. Icons are `NSImage` with `isTemplate` set for files whose name ends in `Template` before the extension.
+
+## Settings window
+
+`Preferences…` opens one `NSWindow` holding a SwiftUI `SettingsView` driven by `SettingsModel`. The tab strip is a real `NSToolbar` with `window.toolbarStyle = .preference`, so it matches Finder Settings; SwiftUI fills only the content below it. Every change is written straight back to `config.toml` through `ConfigFileWriter`, and `ConfigWatcher` is told to ignore the resulting file event. The window is the only way to change these settings, so the config file is never revealed to the user.
+
+**General tab.** Opens first. Daemon approval, the Accessibility grant, and the Karabiner driver, each with a status mark and the action that resolves it; `launch_at_login` and `show_dock_icon`; and Uninstall.
+
+**Configs tab.** A list of config file references, one per `[presets."Name"]` table. Adding runs an `NSOpenPanel` and stores the chosen paths only; no file is copied or moved. The list label is the preset name, renaming rewrites the table header, and deleting removes the table. Selecting an entry shows its name, its file with a Show in Finder button, and its layers, read from the `.kbd` file by `KanataConfigScanner` with `include` forms followed. Each layer plus an "All other layers" row (the `*` key) takes an icon from the `IconCatalog` picker. A value outside the pool shows `exclamationmark.triangle.fill` next to the row, and its layer keeps whatever the file says until a new icon is picked.
+
+**Uninstall.** A sheet with a text field that enables the button only when `UNINSTALL` is typed exactly. It stops kanata, unregisters the daemon and the login item, deletes `~/.config/barnata/`, moves `Barnata.app` to the Trash, then quits. Referenced kanata files are never touched.
+
+`MainMenu` installs an App and Edit menu. A menu bar app draws no menu bar, but `NSApplication` still routes ⌘C, ⌘V, ⌘Z and ⌘W through `mainMenu`, which the settings window's text fields need.
 
 ## App startup sequence
 
-1. Load `config.toml`. On parse error, show an error icon and an "Open config file" item. Keep running.
+1. Load `config.toml`. On parse error, show an error icon and the message in the title line. Keep running.
 2. Apply `show_dock_icon` and `launch_at_login` if present.
 3. Register the daemon. If `requiresApproval`, show the setup item and stop here until approved (poll every 5 s).
 4. Connect XPC, fetch `status`. Run the update flow if versions differ.
@@ -290,10 +297,10 @@ Implementation: AppKit `NSStatusItem` and `NSMenu` built from a `MenuState` valu
 barnata/
   Package.swift
   Sources/
-    BarnataCore/          Config parsing and writing, XPC protocol types, argument allowlist, icon lookup
+    BarnataCore/          Config parsing and writing, TOML line editor, XPC protocol types, argument allowlist, icon catalog, kanata layer scanner
     BarnataDaemonKit/     RequestValidator, ProcessSupervisor, Spawner, BackoffPolicy, SignatureCheck, DriverManager, LogWriter, XPCListener
     barnata-daemon/       main.swift only
-    BarnataAppKit/        AppController, StatusItemController, MenuState, MenuBuilder, DaemonClient, KanataTCPClient, IconStore, ConfigWatcher, SetupActions
+    BarnataAppKit/        AppController, StatusItemController, MenuState, MenuBuilder, DaemonClient, KanataTCPClient, IconStore, ConfigWatcher, SetupActions, SettingsWindowController, SettingsModel, SettingsView, Uninstaller, MainMenu
     Barnata/              main.swift only
   Tests/
     BarnataCoreTests/

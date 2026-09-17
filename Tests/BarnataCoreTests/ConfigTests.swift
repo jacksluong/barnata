@@ -222,8 +222,8 @@ final class InheritanceTests: XCTestCase {
 
         XCTAssertEqual(config.preset(named: "Inherits")?.layerIcons.count, 3)
         XCTAssertEqual(config.preset(named: "Overrides")?.layerIcons, ["base": "other.png"])
-        XCTAssertNil(config.preset(named: "Overrides")?.iconFileName(forLayer: "typing"))
-        XCTAssertEqual(config.preset(named: "Inherits")?.iconFileName(forLayer: "typing"), "typing.png")
+        XCTAssertNil(config.preset(named: "Overrides")?.iconSymbol(forLayer: "typing"))
+        XCTAssertEqual(config.preset(named: "Inherits")?.iconSymbol(forLayer: "typing"), "typing.png")
     }
 
     func testUnknownLayerFallsBackToStar() throws {
@@ -233,8 +233,8 @@ final class InheritanceTests: XCTestCase {
         layer_icons = { base = "base.png", "*" = "default.png" }
         """).presets[0]
 
-        XCTAssertEqual(preset.iconFileName(forLayer: "base"), "base.png")
-        XCTAssertEqual(preset.iconFileName(forLayer: "whatever"), "default.png")
+        XCTAssertEqual(preset.iconSymbol(forLayer: "base"), "base.png")
+        XCTAssertEqual(preset.iconSymbol(forLayer: "whatever"), "default.png")
     }
 }
 

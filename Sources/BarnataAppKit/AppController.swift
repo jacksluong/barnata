@@ -17,6 +17,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
     private var state = MenuState()
     private var config: Config?
+    private var settings: SettingsWindowController?
     private var bundledKanataVersion: String?
     private var setupTimer: Timer?
     private var reloadTimer: Timer?
@@ -40,6 +41,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         state.appVersion = AppBundle.version
         state.currentUID = getuid()
         state.configPath = configURL.path
+        NSApp.mainMenu = MainMenu.make()
 
         loadConfig()
         applyAppSettings()
@@ -272,19 +274,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
         log.info("config file changed, reloading")
         loadConfig()
         applyAppSettings()
+        settings?.model.reload()
         render()
-    }
-
-    private func write(_ key: ConfigWriter.Key, value: Bool) -> Bool {
-        do {
-            let modified = try ConfigFileWriter(url: configURL).set(key, to: value)
-            watcher.ignoreChange(modifiedAt: modified)
-            state.lastActionError = nil
-            return true
-        } catch {
-            state.lastActionError = "cannot write \(configURL.lastPathComponent): \(error.localizedDescription)"
-            return false
-        }
     }
 
     // MARK: - Daemon approval and privacy permissions
@@ -365,53 +356,11 @@ public final class AppController: NSObject, NSApplicationDelegate {
         case .previousConfigFile:
             tcpClient.send(.reloadPrevious)
 
-        case .openConfigFile:
-            setup.open(configURL)
-
         case .openKanataLog:
             setup.open(AppBundle.kanataLogURL)
 
-        case .approveDaemon:
-            setup.registerDaemon()
-            setup.openLoginItems()
-            refreshSetupState()
-
-        case .installDriver:
-            daemonClient.installDriver(onMain { [weak self] result in
-                guard let self else { return }
-                report(result, action: "install the Karabiner driver")
-                if result.ok { setup.openDriverExtensions() }
-            })
-
-        case .activateDriver:
-            daemonClient.activateDriver(onMain { [weak self] result in
-                guard let self else { return }
-                report(result, action: "activate the Karabiner driver")
-                if result.ok { setup.openDriverExtensions() }
-            })
-
-        case .grantAccessibility:
-            // The request is what puts Barnata in the pane, so always make it, then send
-            // the user to the toggle. When the state is undetermined it also prompts.
-            setup.requestAccessibility()
-            if !setup.hasAccessibility { setup.openAccessibility() }
-
-        case .toggleLaunchAtLogin:
-            let value = !state.launchAtLogin
-            guard setup.setLaunchAtLogin(value) else {
-                state.lastActionError = "cannot change the login item"
-                break
-            }
-            _ = write(.launchAtLogin, value: value)
-            state.launchAtLogin = setup.isLaunchAtLoginEnabled
-            config?.app.launchAtLogin = value
-
-        case .toggleShowDockIcon:
-            let value = !state.showDockIcon
-            guard write(.showDockIcon, value: value) else { break }
-            state.showDockIcon = value
-            config?.app.showDockIcon = value
-            statusItem.setDockIconVisible(value)
+        case .openPreferences:
+            showSettings()
 
         case .quit:
             NSApp.terminate(nil)
@@ -419,10 +368,61 @@ public final class AppController: NSObject, NSApplicationDelegate {
         render()
     }
 
+    // MARK: - Settings window
+
+    private func showSettings() {
+        let controller = settings ?? SettingsWindowController(model: makeSettingsModel())
+        settings = controller
+        controller.model.driver = state.driver
+        controller.model.activePresetName = state.activePresetName
+        controller.show()
+    }
+
+    private func makeSettingsModel() -> SettingsModel {
+        SettingsModel(
+            configURL: configURL,
+            setup: setup,
+            actions: SettingsActions(
+                installDriver: { [weak self] completion in
+                    self?.daemonClient.installDriver(onMain { result in
+                        self?.report(result, action: "install the Karabiner driver")
+                        completion(result)
+                    })
+                },
+                activateDriver: { [weak self] completion in
+                    self?.daemonClient.activateDriver(onMain { result in
+                        self?.report(result, action: "activate the Karabiner driver")
+                        completion(result)
+                    })
+                },
+                stopKanata: { [weak self] completion in
+                    self?.daemonClient.stopKanata(onMain { result in
+                        self?.report(result, action: "stop kanata")
+                        completion(result)
+                    })
+                },
+                setDockIconVisible: { [weak self] visible in
+                    self?.state.showDockIcon = visible
+                    self?.config?.app.showDockIcon = visible
+                    self?.statusItem.setDockIconVisible(visible)
+                },
+                configDidChange: { [weak self] modified in
+                    guard let self else { return }
+                    watcher.ignoreChange(modifiedAt: modified)
+                    loadConfig()
+                    applyAppSettings()
+                    render()
+                }
+            )
+        )
+    }
+
     // MARK: - Rendering
 
     private func render() {
         let preset = state.activePresetName.flatMap { config?.preset(named: $0) }
+        settings?.model.driver = state.driver
+        settings?.model.activePresetName = state.activePresetName
         statusItem.render(state, preset: preset)
     }
 }

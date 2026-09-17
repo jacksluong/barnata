@@ -1,6 +1,6 @@
 import Foundation
 
-/// Line edits for the two keys the menu can toggle. The file is never re-serialized, so
+/// Line edits for the keys the app can change. The file is never re-serialized, so
 /// comments, key order, and spacing survive a write.
 public enum ConfigWriter {
     public enum Key: String, Sendable, CaseIterable {
@@ -9,86 +9,87 @@ public enum ConfigWriter {
     }
 
     public static let tableName = "app"
+    public static let presetsTableName = "presets"
+    public static let layerIconsTableName = "layer_icons"
+    public static let kanataConfigKey = "kanata_config"
 
     public static func setting(_ key: Key, to value: Bool, in text: String) -> String {
-        var lines = text.components(separatedBy: "\n")
-
-        guard let table = appTableRange(in: lines) else {
+        var document = TOMLDocument(text)
+        guard document.hasTable([tableName]) else {
             let header = ["[\(tableName)]", "\(key.rawValue) = \(value)", ""]
-            return (header + lines).joined(separator: "\n")
+            return (header + text.components(separatedBy: "\n")).joined(separator: "\n")
+        }
+        document.set(.bool(value), forKey: key.rawValue, inTable: [tableName])
+        return document.text
+    }
+
+    // MARK: - Presets
+
+    public static func presetPath(_ name: String) -> [String] { [presetsTableName, name] }
+
+    public static func layerIconsPath(_ preset: String) -> [String] {
+        presetPath(preset) + [layerIconsTableName]
+    }
+
+    /// Preset names are written quoted, the way `docs/02-config-format.md` spells them
+    public static func renderPath(_ segments: [String]) -> String {
+        segments.enumerated()
+            .map { $0.offset == 1 ? TOMLEncode.string($0.element) : TOMLEncode.key($0.element) }
+            .joined(separator: ".")
+    }
+
+    /// A preset holding one config file, appended after the presets already in the file
+    public static func addPreset(_ name: String, configPath: String, to document: inout TOMLDocument) {
+        document.createTable(
+            presetPath(name),
+            body: ["\(kanataConfigKey) = \(TOMLEncode.string(configPath))"],
+            render: renderPath
+        )
+    }
+
+    public static func removePreset(_ name: String, from document: inout TOMLDocument) {
+        document.removeTable(at: presetPath(name))
+    }
+
+    public static func renamePreset(_ name: String, to newName: String, in document: inout TOMLDocument) {
+        document.renameTable(at: presetPath(name), to: presetPath(newName), render: renderPath)
+    }
+
+    /// Sets one layer's icon, or clears it when `symbol` is nil.
+    /// A preset with no `layer_icons` of its own inherits the defaults table, so the inherited
+    /// map is materialized first and the edit applied on top of it.
+    public static func setLayerIcon(
+        preset: String,
+        layer: String,
+        symbol: String?,
+        inherited: [String: String],
+        in document: inout TOMLDocument
+    ) {
+        let table = layerIconsPath(preset)
+
+        if document.hasKey(layerIconsTableName, inTable: presetPath(preset)) {
+            // An inline `layer_icons = { … }` cannot take a sub-table, so normalize it into one
+            document.removeKey(layerIconsTableName, inTable: presetPath(preset))
+        }
+        if !document.hasTable(table) {
+            document.createTable(
+                table,
+                body: inherited.sorted { $0.key < $1.key }.map {
+                    "\(TOMLEncode.key($0.key)) = \(TOMLEncode.string($0.value))"
+                },
+                render: renderPath
+            )
         }
 
-        if let existing = table.first(where: { keyName(of: lines[$0]) == key.rawValue }) {
-            lines[existing] = replacingValue(in: lines[existing], with: "\(value)")
-            return lines.joined(separator: "\n")
+        if let symbol {
+            document.set(.string(symbol), forKey: layer, inTable: table)
+        } else {
+            document.removeKey(layer, inTable: table)
         }
-
-        let lastEntry = table.last { !lines[$0].trimmingCharacters(in: .whitespaces).isEmpty }
-        lines.insert("\(key.rawValue) = \(value)", at: lastEntry.map { $0 + 1 } ?? table.lowerBound)
-        return lines.joined(separator: "\n")
-    }
-
-    // MARK: - Line parsing
-
-    /// Lines between the `[app]` header and the next table header
-    static func appTableRange(in lines: [String]) -> Range<Int>? {
-        guard let header = lines.indices.first(where: { tableName(of: lines[$0]) == tableName }) else { return nil }
-        let end = lines.indices.first { $0 > header && tableName(of: lines[$0]) != nil } ?? lines.count
-        return (header + 1)..<end
-    }
-
-    /// Table name for a `[name]` header line, nil for anything else including `[[array]]`
-    static func tableName(of line: String) -> String? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard trimmed.hasPrefix("["), !trimmed.hasPrefix("[["), let close = trimmed.lastIndex(of: "]") else { return nil }
-        let inner = trimmed[trimmed.index(after: trimmed.startIndex)..<close]
-        return inner.trimmingCharacters(in: .whitespaces)
-    }
-
-    static func keyName(of line: String) -> String? {
-        let trimmed = line.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty, !trimmed.hasPrefix("#"), !trimmed.hasPrefix("["),
-              let equals = trimmed.firstIndex(of: "=")
-        else { return nil }
-
-        var key = trimmed[trimmed.startIndex..<equals].trimmingCharacters(in: .whitespaces)
-        if key.count >= 2, key.hasPrefix("\""), key.hasSuffix("\"") {
-            key = String(key.dropFirst().dropLast())
-        }
-        return key.isEmpty ? nil : key
-    }
-
-    /// Keeps the indentation, the key, the gap before a trailing comment, and the comment itself
-    static func replacingValue(in line: String, with value: String) -> String {
-        guard let equals = line.firstIndex(of: "=") else { return line }
-        let head = line[line.startIndex...equals]
-        let tail = line[line.index(after: equals)...]
-
-        let commentStart = commentIndex(in: tail) ?? tail.endIndex
-        let gap = tail[tail.startIndex..<commentStart].reversed().prefix { $0 == " " || $0 == "\t" }
-        return head + " " + value + String(gap.reversed()) + tail[commentStart...]
-    }
-
-    /// Offset of the first `#` that is not inside a quoted string
-    private static func commentIndex(in tail: Substring) -> Substring.Index? {
-        var quote: Character?
-        var index = tail.startIndex
-        while index < tail.endIndex {
-            let character = tail[index]
-            if let open = quote {
-                if character == "\\", open == "\"" { index = tail.index(after: index) } else if character == open { quote = nil }
-            } else if character == "\"" || character == "'" {
-                quote = character
-            } else if character == "#" {
-                return index
-            }
-            index = tail.index(after: index)
-        }
-        return nil
     }
 }
 
-/// Atomic writes of the toggled keys, reporting the modification date the watcher should ignore
+/// Atomic writes of the config file, reporting the modification date the watcher should ignore
 public struct ConfigFileWriter: Sendable {
     public let url: URL
 
@@ -98,8 +99,21 @@ public struct ConfigFileWriter: Sendable {
 
     @discardableResult
     public func set(_ key: ConfigWriter.Key, to value: Bool) throws -> Date? {
+        try write { ConfigWriter.setting(key, to: value, in: $0) }
+    }
+
+    @discardableResult
+    public func edit(_ body: (inout TOMLDocument) -> Void) throws -> Date? {
+        try write { text in
+            var document = TOMLDocument(text)
+            body(&document)
+            return document.text
+        }
+    }
+
+    private func write(_ transform: (String) -> String) throws -> Date? {
         let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-        let updated = ConfigWriter.setting(key, to: value, in: existing)
+        let updated = transform(existing)
 
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

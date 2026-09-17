@@ -5,7 +5,7 @@ Repo `~/Developer/dotfiles`, chezmoi source root `home/`. Every path below is re
 ## Files to add
 
 - `dot_config/barnata/config.toml`: the full example from `02-config-format.md`.
-- `dot_config/barnata/icons/*.png`: moved from `private_Library/private_Application Support/kanata-tray/icons/`. Same nine files plus `default.png`.
+- `dot_config/barnata/icons/status-icons/*.png`: only if the bundled status icons need overriding. Layer icons are SF Symbols set in the settings window, so the nine layer PNGs from `private_Library/private_Application Support/kanata-tray/icons/` are not carried over.
 - `.chezmoiscripts/run_once_after_46-barnata-install.sh`: installs or upgrades the app from the private GitHub release. Requires `gh` to be authenticated, which an earlier script already ensures.
 
   ```bash
@@ -104,8 +104,8 @@ run_once_after_99-manual-steps.sh                 text updated
 ## `run_once_after_99-manual-steps.sh` replacement text for the kanata section
 
 ```
-  * Barnata: it launched at the end of `chezmoi apply`. Finish in its
-    menu bar item under Setup:
+  * Barnata: it launched at the end of `chezmoi apply`. Finish in
+    Preferences, General tab, from its menu bar item:
       1. Approve background daemon (admin password once).
       2. If shown, Install Karabiner driver. One click installs and
          activates it; allow it in the System Settings pane that opens.
@@ -124,13 +124,14 @@ arrows, numbers, launcher, system, navcode, modnums, nohrm). The config is
 
 [Barnata](https://github.com/jacksluong/barnata) runs it as a root
 launchd daemon and shows a per-layer icon in the menu bar. Presets and
-icons are in `home/dot_config/barnata/`. First launch asks for one admin
-approval and the Accessibility grant for the app.
+icons are in `home/dot_config/barnata/config.toml`, editable from the
+app's Preferences window. First launch asks for one admin approval and
+the Accessibility grant for the app.
 ```
 
 ## Order of operations on this machine
 
 1. Ship Barnata 0.1.0 as a GitHub release.
 2. Apply the dotfiles change. The cleanup script asks for sudo once to delete the sudoers file. That is the last sudo prompt.
-3. Finish the Setup menu items.
+3. Finish the Permissions rows in Preferences.
 4. Confirm `/etc/sudoers.d` is empty, `launchctl list | grep kanata-tray` is empty, and `ps aux | grep kanata` shows one `kanata` under `barnata-daemon`.

@@ -6,32 +6,6 @@ import XCTest
 final class IconResolverTests: XCTestCase {
     private let resolver = IconResolver(configDirectory: testConfigDirectory)
 
-    func testRelativeIconResolvesAgainstTheIconsDirectory() {
-        XCTAssertEqual(
-            resolver.url(forIconFile: "base.png").path,
-            "/Users/test/.config/barnata/icons/base.png"
-        )
-    }
-
-    func testAbsoluteIconPathIsUsedAsIs() {
-        XCTAssertEqual(resolver.url(forIconFile: "/tmp/base.png").path, "/tmp/base.png")
-    }
-
-    func testLayerResolvesThroughThePresetTable() {
-        let preset = Preset(
-            name: "P",
-            configPaths: ["/tmp/a.kbd"],
-            layerIcons: ["base": "base.png", "*": "default.png"]
-        )
-        XCTAssertEqual(resolver.layerIconURL(forLayer: "base", in: preset)?.lastPathComponent, "base.png")
-        XCTAssertEqual(resolver.layerIconURL(forLayer: "unknown", in: preset)?.lastPathComponent, "default.png")
-    }
-
-    func testPresetWithoutIconsResolvesNothing() {
-        let preset = Preset(name: "P", configPaths: ["/tmp/a.kbd"])
-        XCTAssertNil(resolver.layerIconURL(forLayer: "base", in: preset))
-    }
-
     func testTemplateSuffixDetection() {
         let cases = [("baseTemplate.png", true), ("base.png", false), ("Template.pdf", true), ("templates.png", false)]
         for (fileName, expected) in cases {

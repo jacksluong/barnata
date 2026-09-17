@@ -74,15 +74,15 @@ Targets: `BarnataAppKit` (library) and `BarnataAppKitTests`. `Barnata/main.swift
 - `KanataTCPClient`: `NWConnection` to `127.0.0.1:<port>`, line framing, message enum, reconnect logic.
 - `MenuState` and `MenuBuilder`: value type to `[MenuEntry]` tree, no AppKit imports.
 - `StatusItemController`: renders `[MenuEntry]` into `NSMenu`, icon priority rules, template icon detection, 2 s reload flash, 400 ms delayed spinner for `starting` and `stopping`, `NSStatusItem.squareLength` so the width never changes.
-- `IconStore`: bundled status icons are SF Symbols (`command.circle`, `exclamationmark.triangle.fill`, `pause.circle`, `arrow.triangle.2.circlepath`), so no image assets are committed. `app.status_icons` still overrides them with PNGs from the config directory through `IconResolver`.
-- `SetupActions`: `SMAppService.daemon` register and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` and the Driver Extensions pane, `NSWorkspace.activateFileViewerSelecting` on the app bundle. `AXIsProcessTrusted`/`AXIsProcessTrustedWithOptions` read and request the one privacy grant from the app, which is the only side that can show the prompt.
+- `IconStore`: bundled status icons are SF Symbols (`keyboard.badge.ellipsis`, `exclamationmark.triangle.fill`, `sleep`, `arrow.triangle.2.circlepath`), so no image assets are committed. `app.status_icons` still overrides them with PNGs from the config directory through `IconResolver`. Layer icons are SF Symbols from `IconCatalog`, and a value outside that pool draws `exclamationmark.triangle.fill`.
+- `SetupActions`: `SMAppService.daemon` register, unregister, and status, `SMAppService.mainApp` register/unregister, `SMAppService.openSystemSettingsLoginItems()`, URLs `x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility` and the Driver Extensions pane, `NSWorkspace.activateFileViewerSelecting` on the app bundle. `AXIsProcessTrusted`/`AXIsProcessTrustedWithOptions` read and request the one privacy grant from the app, which is the only side that can show the prompt.
 - `show_dock_icon`: `Info.plist` has `LSUIElement = true`; `true` in config calls `NSApp.setActivationPolicy(.regular)` at launch and on toggle.
 - App entitlements: none. Hardened runtime on. No sandbox.
 
 Tests (XCTest):
 
 - `BarnataCoreTests`: `ConfigWriter` preserves comments, order, and trailing comments; inserts `[app]` when missing; appends a missing key; replaces an existing key.
-- `BarnataAppKitTests`: `MenuBuilder` for each title line variant in `01-architecture.md`, the Setup items shown per `DriverStatus` and daemon status, "Running for another user" enables only Stop, preset checkmark, layer checkmark.
+- `BarnataAppKitTests`: `MenuBuilder` for each title line variant in `01-architecture.md`, "Running for another user" enables only Stop, preset checkmark, layer checkmark, `Preferences…` replacing the Setup submenu. `SettingsModel` against a temporary config file: adding stores a reference and copies nothing, renaming, deleting, layer icon writes, invalid icon values.
 
 Acceptance:
 

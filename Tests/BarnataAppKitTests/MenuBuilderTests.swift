@@ -125,7 +125,7 @@ final class MenuBuilderTests: XCTestCase {
 
     func testPresetsFollowConfigOrderAndAreIndentedUnderAHeader() {
         let entries = MenuBuilder.entries(for: runningState())
-        XCTAssertTrue(entries.labels.contains("Presets"))
+        XCTAssertTrue(entries.labels.contains("Configs"))
         XCTAssertEqual(entries.item(titled: "Default")?.isIndented, true)
     }
 
@@ -199,70 +199,44 @@ final class MenuBuilderTests: XCTestCase {
     }
 }
 
-final class SetupMenuTests: XCTestCase {
-    private func setupItems(_ state: MenuState) -> [String] {
-        MenuBuilder.entries(for: state).submenu(titled: "Setup")?.allItems.map(\.title) ?? []
+final class PreferencesMenuTests: XCTestCase {
+    func testSetupAndOpenConfigAreReplacedByOnePreferencesItem() {
+        let entries = MenuBuilder.entries(for: readyState())
+        XCTAssertNil(entries.submenu(titled: "Setup"))
+
+        let titles = entries.allItems.map(\.title)
+        XCTAssertFalse(titles.contains("Open config file"))
+        XCTAssertEqual(titles.filter { $0 == "Preferences…" }.count, 1)
     }
 
-    func testApprovalItemIsShownUntilTheDaemonIsEnabled() {
-        var unapproved = readyState()
-        unapproved.daemonApproved = false
-        XCTAssertTrue(setupItems(unapproved).contains("Approve background daemon…"))
-        XCTAssertFalse(setupItems(readyState()).contains("Approve background daemon…"))
+    func testPreferencesOpensTheWindowAndKeepsItsShortcut() {
+        let entries = MenuBuilder.entries(for: readyState())
+        XCTAssertEqual(entries.item(titled: "Preferences…")?.action, .openPreferences)
+        XCTAssertEqual(entries.item(titled: "Preferences…")?.keyEquivalent, ",")
+        XCTAssertEqual(entries.item(titled: "Preferences…")?.isEnabled, true)
     }
 
-    func testDriverItemsFollowTheDriverStatus() {
-        let missing = readyState(status: daemonStatus(driver: driverStatus(installed: false, version: nil, activated: false)))
-        XCTAssertTrue(setupItems(missing).contains("Install Karabiner driver…"))
-        XCTAssertFalse(setupItems(missing).contains("Activate Karabiner driver…"))
-
-        let inactive = readyState(status: daemonStatus(driver: driverStatus(activated: false)))
-        XCTAssertTrue(setupItems(inactive).contains("Activate Karabiner driver…"))
-        XCTAssertFalse(setupItems(inactive).contains("Install Karabiner driver…"))
-
-        // Karabiner-Elements already owns a healthy driver, so neither item is offered
-        let healthy = setupItems(readyState())
-        XCTAssertFalse(healthy.contains("Install Karabiner driver…"))
-        XCTAssertFalse(healthy.contains("Activate Karabiner driver…"))
+    func testTheKanataLogItemSurvives() {
+        XCTAssertEqual(MenuBuilder.entries(for: readyState()).item(titled: "Open kanata log")?.action, .openKanataLog)
     }
 
-    func testNoDriverItemsBeforeTheDaemonHasReportedAnything() {
-        var offline = readyState()
-        offline.status = nil
-        XCTAssertFalse(setupItems(offline).contains("Install Karabiner driver…"))
+    func testTheSetupItemsAreGoneEvenWhileSetupIsIncomplete() {
+        var incomplete = readyState(status: daemonStatus(driver: driverStatus(installed: false, version: nil)))
+        incomplete.daemonApproved = false
+        incomplete.hasAccessibility = false
+
+        let titles = MenuBuilder.entries(for: incomplete).allItems.map(\.title)
+        for gone in ["Approve background daemon…", "Install Karabiner driver…", "Launch at login", "Show in Dock"] {
+            XCTAssertFalse(titles.contains(gone), gone)
+        }
+        // The title line is still how an unapproved daemon announces itself
+        XCTAssertEqual(incomplete.title, "Daemon not approved")
     }
 
-    func testTheToggleItemsAreAlwaysPresent() {
-        let items = setupItems(readyState())
-        XCTAssertTrue(items.contains("Launch at login"))
-        XCTAssertTrue(items.contains("Show in Dock"))
-    }
-
-    func testTheGrantItemAppearsOnlyWhileThePermissionIsMissing() {
-        XCTAssertFalse(setupItems(readyState()).contains("Grant \(SystemPaneNames.accessibility)…"))
-
-        var missing = readyState()
-        missing.hasAccessibility = false
-        XCTAssertTrue(setupItems(missing).contains("Grant \(SystemPaneNames.accessibility)…"))
-    }
-
-    func testInputMonitoringIsNotOffered() {
-        var missing = readyState()
-        missing.hasAccessibility = false
-        XCTAssertFalse(setupItems(missing).contains { $0.localizedCaseInsensitiveContains("Input Monitoring") })
-    }
-
-    func testAFullyConfiguredSetupSubmenuIsJustTheTwoToggles() {
-        XCTAssertEqual(setupItems(readyState()), ["Launch at login", "Show in Dock"])
-    }
-
-    func testTheTogglesCarryTheirCheckmarks() {
-        var state = readyState()
-        state.launchAtLogin = true
-        state.showDockIcon = false
-        let setup = MenuBuilder.entries(for: state).submenu(titled: "Setup")
-        XCTAssertEqual(setup?.item(titled: "Launch at login")?.isChecked, true)
-        XCTAssertEqual(setup?.item(titled: "Show in Dock")?.isChecked, false)
+    func testPreferencesIsOfferedEvenWithABrokenConfig() {
+        var broken = readyState()
+        broken.configError = "unknown key"
+        XCTAssertEqual(MenuBuilder.entries(for: broken).item(titled: "Preferences…")?.isEnabled, true)
     }
 }
 

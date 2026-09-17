@@ -41,12 +41,12 @@ Install
 First launch
 
 - [ ] Menu bar icon appears. No Dock icon.
-- [ ] Setup shows "Approve background daemon…". Clicking opens Login Items. Approving asks for the admin password once.
-- [ ] After approval the item disappears within 5 s without relaunching the app.
-- [ ] Setup shows "Install Karabiner driver…". One click installs the pkg, no password, and System Settings opens on Driver Extensions. After allowing, the item disappears and `systemextensionsctl list` shows the dext activated.
-- [ ] (this Mac) With Karabiner-Elements present, no driver items are shown and `DaemonStatus.driver.vhidDaemonManagedByBarnata` is false.
+- [ ] Preferences opens the settings window. General shows "Background daemon" unapproved with an Approve button. Clicking opens Login Items. Approving asks for the admin password once.
+- [ ] After approval the row turns green within 5 s with the window still open.
+- [ ] General shows the Karabiner driver as not installed with an Install button. One click installs the pkg, no password, and System Settings opens on Driver Extensions. After allowing, the row turns green and `systemextensionsctl list` shows the dext activated.
+- [ ] (this Mac) With Karabiner-Elements present, the driver row is already green and `DaemonStatus.driver.vhidDaemonManagedByBarnata` is false.
 - [ ] Grant Accessibility shows the system prompt on a fresh Mac. The pane lists `Barnata` with its icon, not `kanata` or `barnata-daemon`.
-- [ ] Once granted, the Setup item disappears and the autorun preset starts within 5 s without relaunching the app.
+- [ ] Once granted, the row turns green and the autorun preset starts within 5 s without relaunching the app.
 - [ ] `log show --predicate 'process == "tccd"'` shows `subject=io.jackyluong.barnata` for a `kTCCServiceListenEvent` request from `io.jackyluong.barnata.kanata`, answered `authValue=2`, with no Barnata row in the Input Monitoring pane.
 - [ ] If kanata still exits 1 with the Input Monitoring message, `tccutil reset ListenEvent io.jackyluong.barnata` clears a cached silent denial from a uid 0 request. Never a global `tccutil reset`.
 - [ ] After the grant, the autorun preset starts and the keyboard is remapped. No password prompt.
@@ -66,6 +66,23 @@ Running
 - [ ] Stop kanata, then start a different preset. Only one kanata process exists at any time.
 - [ ] Stop kanata on a Mac without Karabiner-Elements: `Karabiner-VirtualHIDDevice-Daemon` exits too.
 - [ ] Suspend kanata startup (`kill -STOP` the pid right after start): after 400 ms the status item shows a spinner; `kill -CONT` returns the layer icon.
+
+Settings window
+
+- [ ] The menu has `Preferences…` and no `Setup` submenu or `Open config file` item.
+- [ ] The window opens on General, and the toolbar lists General before Configs.
+- [ ] Adding a `.kbd` file through the + button creates a preset in `config.toml` and leaves `~/.config/barnata/` holding nothing but `config.toml` and `icons/`. The original file is neither moved nor copied.
+- [ ] The added config lists every layer in the file, including layers in `include`d files.
+- [ ] Renaming a config commits on Return and on clicking away, rewrites the preset header, keeps its icons, and renames it in the list and in the menu bar preset list.
+- [ ] Deleting a config removes the preset and leaves the `.kbd` file on disk.
+- [ ] Picking an icon for a layer writes an SF Symbol name into `[presets."<name>".layer_icons]` and the menu bar icon changes when that layer is active.
+- [ ] A hand-written `layer_icons` value that is not in the pool shows `exclamationmark.triangle.fill` on the layer row and in the menu bar, and the value is left in the file until an icon is picked.
+- [ ] Toggling Launch at login and Show in Dock writes the key and takes effect immediately.
+- [ ] Editing `config.toml` in an editor while the window is open updates the window. The window itself never offers to open or reveal that file.
+- [ ] A comment in `config.toml` survives every change made from the window.
+- [ ] ⌘C, ⌘V, and ⌘A work in the name field.
+- [ ] Uninstall is disabled until `UNINSTALL` is typed exactly. Lowercase and trailing spaces keep it disabled.
+- [ ] Uninstall stops kanata, removes the daemon and login item, deletes `~/.config/barnata/`, moves the app to the Trash, and quits. The referenced `.kbd` files are still there.
 
 App lifecycle
 

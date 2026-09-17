@@ -10,14 +10,8 @@ public enum MenuAction: Sendable, Hashable {
     case reloadConfig
     case nextConfigFile
     case previousConfigFile
-    case openConfigFile
     case openKanataLog
-    case approveDaemon
-    case installDriver
-    case activateDriver
-    case grantAccessibility
-    case toggleLaunchAtLogin
-    case toggleShowDockIcon
+    case openPreferences
     case quit
 }
 

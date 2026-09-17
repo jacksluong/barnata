@@ -12,4 +12,4 @@ swift build
 swift test
 ```
 
-`swift test` requires the Xcode-beta toolchain, which `Scripts/vars.sh` selects through `DEVELOPER_DIR`.
+`swift test` requires the Xcode toolchain, which `Scripts/vars.sh` selects through `DEVELOPER_DIR`.

@@ -2,16 +2,17 @@ import AppKit
 import BarnataCore
 import Foundation
 
-/// Menu bar images. Bundled status icons are SF Symbols; `app.status_icons` overrides them with files.
+/// Menu bar images. Status icons are SF Symbols that `app.status_icons` can override with files.
+/// Layer icons are SF Symbols from `IconCatalog`; a value outside the pool draws the warning symbol.
 @MainActor
 public final class IconStore {
     /// Every image is fitted into this square so the status item never changes width
     public static let imageSize: CGFloat = 18
 
     private static let symbolNames: [IconResolver.StatusIcon: String] = [
-        .normal: "command.circle",
+        .normal: "keyboard.badge.ellipsis",
         .crashed: "exclamationmark.triangle.fill",
-        .paused: "pause.circle",
+        .paused: "sleep",
         .reloading: "arrow.triangle.2.circlepath",
     ]
 
@@ -30,10 +31,9 @@ public final class IconStore {
         case .status(let icon):
             return statusImage(icon)
         case .layer(let layer):
-            guard let preset, let url = resolver?.layerIconURL(forLayer: layer, in: preset),
-                  let image = fileImage(at: url)
-            else { return statusImage(.normal) }
-            return image
+            guard let symbol = preset?.iconSymbol(forLayer: layer) else { return statusImage(.normal) }
+            guard IconCatalog.contains(symbol) else { return symbolImage(IconCatalog.warningSymbol) }
+            return symbolImage(symbol) ?? statusImage(.normal)
         }
     }
 
@@ -54,11 +54,13 @@ public final class IconStore {
     }
 
     private func symbolImage(_ icon: IconResolver.StatusIcon) -> NSImage? {
-        let key = "symbol:\(icon.rawValue)"
+        IconStore.symbolNames[icon].flatMap { symbolImage($0) }
+    }
+
+    private func symbolImage(_ name: String) -> NSImage? {
+        let key = "symbol:\(name)"
         if let cached = cache[key] { return cached }
-        guard let name = IconStore.symbolNames[icon],
-              let image = NSImage(systemSymbolName: name, accessibilityDescription: icon.rawValue)
-        else { return nil }
+        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: name) else { return nil }
 
         let configured = image.withSymbolConfiguration(
             NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)

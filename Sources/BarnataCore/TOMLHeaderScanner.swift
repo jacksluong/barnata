@@ -11,7 +11,7 @@ enum TOMLHeaderScanner {
         return names
     }
 
-    private static func keyPath(in line: String) -> [String]? {
+    static func keyPath(in line: String) -> [String]? {
         let characters = Array(line.trimmingCharacters(in: .whitespaces))
         guard characters.first == "[" else { return nil }
         guard characters.count > 1, characters[1] != "[" else { return nil }

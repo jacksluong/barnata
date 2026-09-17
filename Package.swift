@@ -21,6 +21,7 @@ let package = Package(
         ),
         .target(name: "BarnataAppKit", dependencies: ["BarnataCore"]),
         .executableTarget(name: "Barnata", dependencies: ["BarnataAppKit"]),
+        .executableTarget(name: "SettingsPreview", dependencies: ["BarnataAppKit"]),
         .target(name: "BarnataDaemonKit", dependencies: ["BarnataCore"]),
         .executableTarget(name: "barnata-daemon", dependencies: ["BarnataDaemonKit"]),
         .testTarget(name: "BarnataCoreTests", dependencies: ["BarnataCore"]),

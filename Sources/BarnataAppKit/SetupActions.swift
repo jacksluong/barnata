@@ -35,6 +35,16 @@ public struct SetupActions {
         }
     }
 
+    /// Unregistering also stops whatever the daemon is running, so uninstall needs nothing else
+    public func unregisterDaemon() {
+        do {
+            try daemon.unregister()
+            log.notice("unregistered the daemon")
+        } catch {
+            log.error("cannot unregister the daemon: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
     public func openLoginItems() {
         SMAppService.openSystemSettingsLoginItems()
     }

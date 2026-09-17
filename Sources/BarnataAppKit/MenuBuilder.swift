@@ -11,7 +11,6 @@ public enum MenuBuilder {
         entries.append(contentsOf: kanataControls(state))
         entries.append(.separator)
         entries.append(contentsOf: files(state))
-        entries.append(.submenu(MenuItem(title: "Setup"), setup(state)))
         entries.append(.separator)
         // Quitting always stops kanata, so no shortcut that could be hit by accident
         entries.append(.item(MenuItem(title: "Quit Barnata", action: .quit)))
@@ -23,7 +22,7 @@ public enum MenuBuilder {
             return [.item(MenuItem(title: "No presets in config.toml", isEnabled: false))]
         }
 
-        return [.label("Presets")] + state.presetNames.map { name in
+        return [.label("Configs")] + state.presetNames.map { name in
             let isActive = state.activePresetName == name
             return .item(MenuItem(
                 title: name,
@@ -76,42 +75,8 @@ public enum MenuBuilder {
 
     private static func files(_ state: MenuState) -> [MenuEntry] {
         [
-            .item(MenuItem(title: "Open config file", action: .openConfigFile)),
             .item(MenuItem(title: "Open kanata log", action: .openKanataLog)),
+            .item(MenuItem(title: "Preferences…", action: .openPreferences, keyEquivalent: ",")),
         ]
-    }
-
-    private static func setup(_ state: MenuState) -> [MenuEntry] {
-        var entries: [MenuEntry] = []
-
-        if !state.daemonApproved {
-            entries.append(.item(MenuItem(title: "Approve background daemon…", action: .approveDaemon)))
-        }
-        if let driver = state.driver {
-            if !driver.installed {
-                entries.append(.item(MenuItem(title: "Install Karabiner driver…", action: .installDriver)))
-            } else if !driver.activated {
-                entries.append(.item(MenuItem(title: "Activate Karabiner driver…", action: .activateDriver)))
-            }
-        }
-
-        if !state.hasAccessibility {
-            entries.append(.item(MenuItem(
-                title: "Grant \(SystemPaneNames.accessibility)…",
-                action: .grantAccessibility
-            )))
-        }
-        if !entries.isEmpty { entries.append(.separator) }
-        entries.append(.item(MenuItem(
-            title: "Launch at login",
-            action: .toggleLaunchAtLogin,
-            isChecked: state.launchAtLogin
-        )))
-        entries.append(.item(MenuItem(
-            title: "Show in Dock",
-            action: .toggleShowDockIcon,
-            isChecked: state.showDockIcon
-        )))
-        return entries
     }
 }

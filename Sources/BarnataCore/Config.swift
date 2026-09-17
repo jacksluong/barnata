@@ -92,7 +92,11 @@ public struct Preset: Sendable, Equatable {
         )
     }
 
-    public func iconFileName(forLayer layer: String) -> String? {
+    /// SF Symbol name for a layer, falling back to the `*` entry
+    public func iconSymbol(forLayer layer: String) -> String? {
         layerIcons[layer] ?? layerIcons[Preset.layerIconFallbackKey]
     }
+
+    /// Layer icons set to something outside `IconCatalog`
+    public var invalidLayerIcons: [String] { IconCatalog.invalidLayerIcons(in: self) }
 }

@@ -1,6 +1,7 @@
 import Foundation
 
-/// Turns layer names and status states into icon files under the config directory
+/// Turns status states into icon files under the config directory. Layer icons are
+/// SF Symbols from `IconCatalog` and never touch the filesystem.
 public struct IconResolver: Sendable, Equatable {
     public enum StatusIcon: String, CaseIterable, Sendable {
         case normal = "default"
@@ -25,14 +26,6 @@ public struct IconResolver: Sendable, Equatable {
 
     public init(config: Config, configURL: URL) {
         self.init(configDirectory: configURL.deletingLastPathComponent(), statusIcons: config.app.statusIcons)
-    }
-
-    public func layerIconURL(forLayer layer: String, in preset: Preset) -> URL? {
-        preset.iconFileName(forLayer: layer).map(url(forIconFile:))
-    }
-
-    public func url(forIconFile file: String) -> URL {
-        file.hasPrefix("/") ? URL(fileURLWithPath: file) : iconsDirectory.appending(path: file)
     }
 
     /// Override file for a status icon, nil when the app should use its bundled copy

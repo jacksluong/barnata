@@ -1,22 +1,22 @@
 # 02. Config format
 
-File: `~/.config/barnata/config.toml`. Override the location with the `BARNATA_CONFIG` environment variable (absolute path to a file). Icons live in `icons/` next to the config file. Relative icon paths resolve against that directory.
+File: `~/.config/barnata/config.toml`. Override the location with the `BARNATA_CONFIG` environment variable (absolute path to a file). Status icon overrides live in `icons/` next to the config file; relative `status_icons` paths resolve against that directory.
 
-The config file is the single source of truth. The app writes to it only for the two keys marked writable below, and only when their menu items are toggled.
+The config file is the single source of truth, for hand edits and for the settings window alike. Everything the settings window changes is written back here.
 
 ## Schema
 
 ```toml
 [app]
-launch_at_login = true          # optional; absent leaves the system setting untouched. Writable by the menu.
-show_dock_icon = false          # optional, default false. Writable by the menu.
+launch_at_login = true          # optional; absent leaves the system setting untouched. Writable by the settings window.
+show_dock_icon = false          # optional, default false. Writable by the settings window.
 status_icons = "status-icons"   # optional; directory with default/crashed/paused/reloading overrides
 
 [defaults]                      # applied to every preset unless the preset overrides the key
 tcp_port = 5829                 # 1024...65535
 autorestart_on_crash = false
 extra_args = []                 # allowlisted kanata flags only
-layer_icons = {}                # layer name -> icon file, '*' is the fallback
+layer_icons = {}                # layer name -> SF Symbol name, '*' is the fallback
 
 [presets."Default"]             # table name is the preset name shown in the menu
 kanata_config = "~/.config/kanata/canary.kbd"   # string or array of strings; array enables ReloadNext/ReloadPrev
@@ -27,22 +27,28 @@ autorun = true                  # at most one preset may set this
 Rules:
 
 - `~` at the start of a path expands to the home directory. Paths are resolved to absolute before being sent to the daemon.
-- `kanata_config` files must exist when a preset is started. A missing file is reported in the menu, the preset stays selectable.
+- `kanata_config` files must exist when a preset is started. A missing file is flagged in the settings window, the preset stays selectable.
 - `extra_args` entries outside the allowlist in `01-architecture.md` make the config invalid. The error names the flag.
 - Preset order in the menu is the order in the file.
 - Unknown keys are errors.
-- `layer_icons` in a preset replaces the defaults table entirely.
+- `layer_icons` in a preset replaces the defaults table entirely. The settings window always writes into the preset, copying the inherited defaults in on the first edit.
+- `layer_icons` values are SF Symbol names from `IconCatalog` in `BarnataCore`. Anything else is shown as `exclamationmark.triangle.fill` in the menu bar and flagged in the settings window. Invalid values are left in the file until an icon is picked.
+- Each config file added through the settings window becomes one preset holding one `kanata_config` path. Hand-written presets with several paths keep working and show all their paths.
 
-## Writing `launch_at_login` and `show_dock_icon`
+## Writing
 
-`ConfigWriter` in `BarnataCore` edits the file line by line and never re-serializes it:
+`TOMLDocument` in `BarnataCore` holds the file as its own lines and edits those lines, so comments, key order, and spacing outside the edited key survive every write. `ConfigWriter` layers the config-specific operations on top of it, and `ConfigFileWriter` does the atomic write (temp file plus rename) and returns the resulting modification date. `ConfigWatcher` ignores the next change event whose modification date equals that one.
 
-1. Find the `[app]` table header. If absent, insert `[app]` and a blank line at the top of the file.
-2. Inside that table (up to the next header), find the first line whose key is the target. Replace the value on that line, keeping indentation and any trailing comment.
-3. If the key is absent, append `key = value` as the last line of the table.
-4. Write atomically (temp file plus rename) and record the resulting modification date.
+| Operation | Effect on the file |
+|---|---|
+| Set `launch_at_login` or `show_dock_icon` | Replace the value on the existing line in `[app]`, keeping indentation and any trailing comment. Append the key to the table if absent, or insert `[app]` at the top of the file if the table is absent. |
+| Add a config file | Append `[presets."Name"]` with one `kanata_config` line, after the presets already in the file. |
+| Rename a config file | Rewrite the `[presets."Old"]` header and the header of every table nested under it. |
+| Delete a config file | Remove the preset header, its body, and its nested tables. |
+| Set a layer icon | Set the key in `[presets."Name".layer_icons]`, creating that sub-table under its preset. An inline `layer_icons = { … }` is normalized into the sub-table first. |
+| Clear a layer icon | Remove the key from `[presets."Name".layer_icons]`. |
 
-`ConfigWatcher` ignores the next change event whose modification date equals the recorded one.
+Preset names are always written quoted. Layer names are written bare when they are valid bare keys, so the `*` fallback is written `"*"`.
 
 ## Full example matching the current setup
 
@@ -55,21 +61,21 @@ show_dock_icon = false
 tcp_port = 5829
 autorestart_on_crash = false
 
-[defaults.layer_icons]
-base     = "base.png"
-typing   = "typing.png"
-arrows   = "arrows.png"
-numbers  = "numbers.png"
-launcher = "launcher.png"
-system   = "system.png"
-navcode  = "navcode.png"
-modnums  = "modnums.png"
-nohrm    = "nohrm.png"
-"*"      = "default.png"
-
 [presets."Default"]
 kanata_config = "~/.config/kanata/canary.kbd"
 autorun = true
+
+[presets."Default".layer_icons]
+base     = "command"
+typing   = "keyboard"
+arrows   = "arrow.up.arrow.down"
+numbers  = "number"
+launcher = "square.grid.2x2"
+system   = "gearshape"
+navcode  = "chevron.left.forwardslash.chevron.right"
+modnums  = "textformat.123"
+nohrm    = "hand.raised"
+"*"      = "command.circle"
 ```
 
 ## Not carried over from kanata-tray
