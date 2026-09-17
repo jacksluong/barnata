@@ -1,6 +1,6 @@
 # 02. Config format
 
-File: `~/.config/barnata/config.toml`. Override the location with the `BARNATA_CONFIG` environment variable (absolute path to a file). Status icon overrides live in `icons/` next to the config file; relative `status_icons` paths resolve against that directory.
+File: `~/.config/barnata/config.toml`. Override the location with the `BARNATA_CONFIG` environment variable (absolute path to a file). Barnata creates the file and its directory on the first read or write if they are absent, holding an empty `[app]` and `[defaults]`. Status icon overrides live in `icons/` next to the config file; relative `status_icons` paths resolve against that directory.
 
 The config file is the single source of truth, for hand edits and for the settings window alike. Everything the settings window changes is written back here.
 
@@ -19,7 +19,7 @@ extra_args = []                 # allowlisted kanata flags only
 layer_icons = {}                # layer name -> SF Symbol name, '*' is the fallback
 
 [presets."Default"]             # table name is the preset name shown in the menu
-kanata_config = "~/.config/kanata/canary.kbd"   # string or array of strings; array enables ReloadNext/ReloadPrev
+kanata_config = "~/.config/kanata/example.kbd"   # string or array of strings; array enables ReloadNext/ReloadPrev
 autorun = true                  # at most one preset may set this
 # tcp_port, autorestart_on_crash, extra_args, layer_icons may be overridden here
 ```
@@ -62,7 +62,7 @@ tcp_port = 5829
 autorestart_on_crash = false
 
 [presets."Default"]
-kanata_config = "~/.config/kanata/canary.kbd"
+kanata_config = "~/.config/kanata/example.kbd"
 autorun = true
 
 [presets."Default".layer_icons]

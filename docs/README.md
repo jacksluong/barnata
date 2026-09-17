@@ -46,7 +46,7 @@ The name `Barnata`, bundle id `io.jackyluong.barnata`, and Team ID are build-tim
 
 Gathered on 2026-09-04 from `~/Developer/dotfiles` and the running system.
 
-- kanata 1.12.0 from Homebrew at `/opt/homebrew/bin/kanata`, compiled without `cmd`. Running as root with `-c ~/.config/kanata/canary.kbd --port 5829`.
+- kanata 1.12.0 from Homebrew at `/opt/homebrew/bin/kanata`, compiled without `cmd`. Running as root with `-c ~/.config/kanata/kanata.kbd --port 5829`.
 - kanata-tray from Homebrew, started by `~/Library/LaunchAgents/com.kanata-tray.plist` with `ProgramArguments = [sudo, /opt/homebrew/bin/kanata-tray]`, `KeepAlive = true`.
 - `/etc/sudoers.d/kanata-tray` grants `NOPASSWD:SETENV` for the kanata-tray binary, pinned by sha256, installed by `run_onchange_after_48-kanata-sudoers.sh.tmpl`.
 - kanata-tray config at `~/Library/Application Support/kanata-tray/kanata-tray.toml` with one preset (`Default Preset`, autorun) and nine layer icons in `icons/`.

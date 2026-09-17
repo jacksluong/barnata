@@ -4,6 +4,15 @@ Menu bar app for [kanata](https://github.com/jtroo/kanata) on macOS. kanata runs
 
 Planning documents live in `docs/`, starting with `docs/README.md`.
 
+## Install
+
+```sh
+brew install --cask jacksluong/tap/barnata
+open -a Barnata
+```
+
+Apple silicon, macOS 14 or later. Settings live in `~/.config/barnata/config.toml`, which the app creates on first launch.
+
 ## Build
 
 ```sh

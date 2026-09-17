@@ -12,7 +12,7 @@ final class TOMLDocumentTests: XCTestCase {
         launch_at_login = false   # trailing
 
         [defaults]
-        tcp_port = 5829
+        autorestart_on_crash = false
         """)
         document.set(.bool(true), forKey: "launch_at_login", inTable: ["app"])
 
@@ -23,7 +23,7 @@ final class TOMLDocumentTests: XCTestCase {
         launch_at_login = true   # trailing
 
         [defaults]
-        tcp_port = 5829
+        autorestart_on_crash = false
         """)
     }
 

@@ -38,18 +38,19 @@ NSHumanReadableCopyright    Jacky Luong
 
 ## Notarization
 
-```
-ditto -c -k --keepParent build/Barnata.app build/Barnata.zip
-xcrun notarytool submit build/Barnata.zip --keychain-profile barnata --wait
-xcrun stapler staple build/Barnata.app
-ditto -c -k --keepParent build/Barnata.app build/Barnata-<version>.zip
-```
+`Scripts/notarize.sh` zips `build/Barnata.app`, submits it with `--keychain-profile barnata --wait`, staples the ticket, writes `build/Barnata-<version>.zip`, and prints its sha256. The version comes from the built `Info.plist`.
 
 On rejection, `xcrun notarytool log <id> --keychain-profile barnata` lists the offending binary. The usual cause is a binary without hardened runtime or without a timestamp.
 
+## Release
+
+`Scripts/release.sh <version>` runs the whole sequence: refuse a dirty tree, `swift test`, tag `v<version>`, `build-app.sh`, `notarize.sh`, push the tag, `gh release create` with the zip attached, then bump `version` and `sha256` in the local tap checkout. `--dry-run` stops after notarization and deletes the tag.
+
+The tag has to exist before the build, because `build-app.sh` reads the version back out of `git describe`.
+
 ## Release artifact
 
-`Barnata-<version>.zip` attached to a GitHub release on `jacksluong/barnata`. No dmg. No pkg. The repo is public and the release asset downloads without authentication.
+`Barnata-<version>.zip` attached to a GitHub release on `jacksluong/barnata`. No dmg. No pkg. It exists so the cask has something to download.
 
 ## Install on another Mac
 
@@ -58,15 +59,7 @@ brew install --cask jacksluong/tap/barnata
 open -a Barnata
 ```
 
-Without Homebrew:
-
-```
-gh release download --repo jacksluong/barnata --pattern 'Barnata-*.zip' --dir /tmp/barnata --clobber
-ditto -x -k /tmp/barnata/Barnata-*.zip /Applications
-open -a Barnata
-```
-
-`brew upgrade --cask barnata` or the same three commands upgrade an existing install. `05-dotfiles-migration.md` wraps them in a chezmoi script.
+`brew upgrade --cask barnata` upgrades an existing install. `05-dotfiles-migration.md` wraps both in a chezmoi script.
 
 The bundle must run from `/Applications`. Running from `~/Downloads` is refused by the app with an alert that names `/Applications`.
 
@@ -78,7 +71,7 @@ Install the new version over the old one. On launch the app runs the update flow
 
 A cask, not a formula. The released zip is already signed, notarized, and stapled.
 
-Repo `jacksluong/homebrew-tap`, file `Casks/barnata.rb`:
+Repo `jacksluong/homebrew-tap`, file `Casks/barnata.rb`, checked out locally at `TAP_DIR` (`~/Developer/homebrew-tap` by default):
 
 ```ruby
 cask "barnata" do
@@ -98,11 +91,14 @@ cask "barnata" do
   uninstall launchctl: "io.jackyluong.barnata.daemon",
             quit:      "io.jackyluong.barnata"
 
-  zap trash: "~/.config/barnata"
+  zap trash: [
+    "~/.config/barnata",
+    "/Library/Logs/Barnata",
+  ]
 end
 ```
 
-`Scripts/release.sh` already prints the sha256. Bumping the cask is a manual commit to the tap.
+`Scripts/release.sh` rewrites the `version` and `sha256` lines. Committing and pushing the tap stays manual.
 
 ## Licensing
 

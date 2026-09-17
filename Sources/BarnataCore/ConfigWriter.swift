@@ -112,6 +112,7 @@ public struct ConfigFileWriter: Sendable {
     }
 
     private func write(_ transform: (String) -> String) throws -> Date? {
+        ConfigLoader.createIfMissing(at: url)
         let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
         let updated = transform(existing)
 

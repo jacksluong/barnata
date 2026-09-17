@@ -9,14 +9,12 @@ final class ConfigParsingTests: XCTestCase {
 
         XCTAssertEqual(config.app.launchAtLogin, true)
         XCTAssertFalse(config.app.showDockIcon)
-        XCTAssertEqual(config.defaults.tcpPort, 5829)
         XCTAssertEqual(config.defaults.layerIcons["base"], "base.png")
         XCTAssertEqual(config.defaults.layerIcons["*"], "default.png")
 
         let preset = try XCTUnwrap(config.preset(named: "Default"))
         XCTAssertTrue(preset.autorun)
-        XCTAssertEqual(preset.configPaths, ["/Users/test/.config/kanata/canary.kbd"])
-        XCTAssertEqual(preset.tcpPort, 5829)
+        XCTAssertEqual(preset.configPaths, ["/Users/test/.config/kanata/example.kbd"])
         XCTAssertEqual(preset.layerIcons.count, 10)
         XCTAssertEqual(config.autorunPreset?.name, "Default")
     }
@@ -26,7 +24,6 @@ final class ConfigParsingTests: XCTestCase {
         XCTAssertTrue(config.presets.isEmpty)
         XCTAssertFalse(config.app.showDockIcon)
         XCTAssertNil(config.app.launchAtLogin)
-        XCTAssertEqual(config.defaults.tcpPort, PresetDefaults.defaultTCPPort)
     }
 
     func testPresetsKeepFileOrder() throws {
@@ -96,25 +93,25 @@ final class PathTests: XCTestCase {
     func testTildeExpansion() throws {
         let config = try parseConfig("""
         [presets."P"]
-        kanata_config = "~/keys/canary.kbd"
+        kanata_config = "~/keys/example.kbd"
         """)
-        XCTAssertEqual(config.presets[0].configPaths, ["/Users/test/keys/canary.kbd"])
+        XCTAssertEqual(config.presets[0].configPaths, ["/Users/test/keys/example.kbd"])
     }
 
     func testRelativePathResolvesAgainstConfigDirectory() throws {
         let config = try parseConfig("""
         [presets."P"]
-        kanata_config = "kbd/canary.kbd"
+        kanata_config = "kbd/example.kbd"
         """)
-        XCTAssertEqual(config.presets[0].configPaths, ["/Users/test/.config/barnata/kbd/canary.kbd"])
+        XCTAssertEqual(config.presets[0].configPaths, ["/Users/test/.config/barnata/kbd/example.kbd"])
     }
 
     func testAbsolutePathIsStandardized() throws {
         let config = try parseConfig("""
         [presets."P"]
-        kanata_config = "/etc/kanata/../kanata/canary.kbd"
+        kanata_config = "/etc/kanata/../kanata/example.kbd"
         """)
-        XCTAssertEqual(config.presets[0].configPaths, ["/etc/kanata/canary.kbd"])
+        XCTAssertEqual(config.presets[0].configPaths, ["/etc/kanata/example.kbd"])
     }
 
     func testBareTildeIsHome() {
@@ -172,7 +169,6 @@ final class InheritanceTests: XCTestCase {
     func testPresetInheritsEveryDefault() throws {
         let preset = try parseConfig("""
         [defaults]
-        tcp_port = 6000
         autorestart_on_crash = true
         extra_args = ["--debug"]
 
@@ -183,7 +179,6 @@ final class InheritanceTests: XCTestCase {
         kanata_config = "/tmp/a.kbd"
         """).presets[0]
 
-        XCTAssertEqual(preset.tcpPort, 6000)
         XCTAssertTrue(preset.autorestartOnCrash)
         XCTAssertEqual(preset.extraArgs, ["--debug"])
         XCTAssertEqual(preset.layerIcons, ["base": "base.png"])
@@ -192,16 +187,13 @@ final class InheritanceTests: XCTestCase {
     func testPresetOverridesWin() throws {
         let preset = try parseConfig("""
         [defaults]
-        tcp_port = 6000
         autorestart_on_crash = true
 
         [presets."P"]
         kanata_config = "/tmp/a.kbd"
-        tcp_port = 7000
         autorestart_on_crash = false
         """).presets[0]
 
-        XCTAssertEqual(preset.tcpPort, 7000)
         XCTAssertFalse(preset.autorestartOnCrash)
     }
 
@@ -256,12 +248,9 @@ final class ValidationTests: XCTestCase {
         }
     }
 
-    func testPortRange() {
-        for port in [80, 1023, 65536] {
-            assertConfigError("[defaults]\ntcp_port = \(port)") { error in
-                XCTAssertEqual(error.keyPath, "defaults.tcp_port")
-                XCTAssertTrue(error.reason.contains("1024"), error.reason)
-            }
+    func testTCPPortIsNoLongerAConfigKey() {
+        assertConfigError("[defaults]\ntcp_port = 5829") { error in
+            XCTAssertEqual(error.description, "defaults.tcp_port: unknown key")
         }
     }
 
@@ -328,5 +317,42 @@ final class ConfigLocationTests: XCTestCase {
         XCTAssertThrowsError(try ConfigLoader.load(from: URL(fileURLWithPath: "/nope/config.toml"), home: testHome)) {
             XCTAssertTrue("\($0)".contains("/nope/config.toml"), "\($0)")
         }
+    }
+
+    func testLoadCreatesTheFileAndItsDirectory() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let file = root.appending(path: "barnata/config.toml")
+        let config = try ConfigLoader.load(from: file, home: testHome)
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), ConfigLoader.template)
+        XCTAssertEqual(config.presets, [])
+        XCTAssertFalse(config.app.showDockIcon)
+    }
+
+    func testLoadLeavesAnExistingFileAlone() throws {
+        let directory = URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        let file = directory.appending(path: "config.toml")
+        try fullConfigExample.write(to: file, atomically: true, encoding: .utf8)
+
+        _ = try ConfigLoader.load(from: file, home: testHome)
+        XCTAssertEqual(try String(contentsOf: file, encoding: .utf8), fullConfigExample)
+    }
+
+    func testWritingToAMissingFileStartsFromTheTemplate() throws {
+        let root = URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let file = root.appending(path: "barnata/config.toml")
+        try ConfigFileWriter(url: file).set(.showDockIcon, to: true)
+
+        let text = try String(contentsOf: file, encoding: .utf8)
+        XCTAssertTrue(text.contains("[defaults]"), text)
+        XCTAssertEqual(try ConfigLoader.load(from: file, home: testHome).app.showDockIcon, true)
     }
 }

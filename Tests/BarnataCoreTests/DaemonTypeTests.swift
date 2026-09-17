@@ -7,8 +7,7 @@ final class DaemonTypeTests: XCTestCase {
     func testStartRequestSurvivesAnEnvelopeRoundTrip() throws {
         let request = StartRequest(
             presetName: "Default",
-            configPaths: ["/Users/test/.config/kanata/canary.kbd"],
-            tcpPort: 5829,
+            configPaths: ["/Users/test/.config/kanata/example.kbd"],
             extraArgs: ["--debug"],
             autorestartOnCrash: true
         )
@@ -40,14 +39,12 @@ final class DaemonTypeTests: XCTestCase {
             name: "Default",
             configPaths: ["/tmp/a.kbd"],
             autorun: true,
-            tcpPort: 6000,
             autorestartOnCrash: true,
             extraArgs: ["--quiet"]
         )
         let request = preset.startRequest
         XCTAssertEqual(request.presetName, "Default")
         XCTAssertEqual(request.configPaths, ["/tmp/a.kbd"])
-        XCTAssertEqual(request.tcpPort, 6000)
         XCTAssertTrue(request.autorestartOnCrash)
         XCTAssertEqual(request.extraArgs, ["--quiet"])
     }

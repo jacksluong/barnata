@@ -9,6 +9,11 @@ TEAM_ID="EE3526PL64"
 SIGNING_IDENTITY="E20ADF15A9A4E3839E3E0D9BC60B5DBE81BD2F8D"   # Developer ID Application: Jacky Luong, expires 2031-09-05
 NOTARY_PROFILE="barnata"
 
+GITHUB_REPO="jacksluong/barnata"
+TAP_REPO="jacksluong/homebrew-tap"
+CASK_NAME="barnata"
+CASK_TOKEN="jacksluong/tap/barnata"
+
 KANATA_VERSION="1.12.0"
 DRIVER_VERSION="6.8.0"
 DRIVER_PKG_URL="https://github.com/pqrs-org/Karabiner-DriverKit-VirtualHIDDevice/releases/download/v${DRIVER_VERSION}/Karabiner-DriverKit-VirtualHIDDevice-${DRIVER_VERSION}.pkg"
@@ -20,6 +25,9 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Develope
 VARS_SELF="${BASH_SOURCE[0]:-$0}"
 REPO_ROOT="$(cd "$(dirname "$VARS_SELF")/.." && pwd)"
 BUILD_DIR="${REPO_ROOT}/build"
+
+# Local checkout of the tap. release.sh bumps the cask here; pushing it stays manual.
+TAP_DIR="${TAP_DIR:-$(dirname "$REPO_ROOT")/homebrew-tap}"
 
 # Compares a downloaded file against the sha256 recorded in checksums.txt for that name
 verify_sha256() {

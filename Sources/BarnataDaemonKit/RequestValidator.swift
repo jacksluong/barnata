@@ -50,16 +50,19 @@ public struct PosixFileInspector: FileInspecting {
 public struct ValidatedStartRequest: Sendable, Equatable {
     public var presetName: String
     public var configPaths: [String]
-    public var tcpPort: Int
     public var extraArgs: [String]
     public var autorestartOnCrash: Bool
     public var ownerUID: uid_t
+    /// argv without the listen flag, which the supervisor adds once it has picked a port
     public var arguments: [String]
+
+    public func arguments(listeningOn port: Int) -> [String] {
+        arguments + ["-p", "\(RequestValidator.listenAddress):\(port)"]
+    }
 }
 
 public struct RequestValidator: Sendable {
     public static let listenAddress = "127.0.0.1"
-    public static let portRange = 1024...65535
 
     private let inspector: FileInspecting
 
@@ -90,13 +93,6 @@ public struct RequestValidator: Sendable {
             }
         }
 
-        guard RequestValidator.portRange.contains(request.tcpPort) else {
-            throw ValidationError(
-                rule: "tcp port out of range",
-                detail: "\(request.tcpPort) is outside 1024...65535"
-            )
-        }
-
         do {
             try ArgAllowlist.validate(request.extraArgs)
         } catch let error as ArgAllowlistError {
@@ -106,7 +102,6 @@ public struct RequestValidator: Sendable {
         return ValidatedStartRequest(
             presetName: request.presetName,
             configPaths: request.configPaths,
-            tcpPort: request.tcpPort,
             extraArgs: request.extraArgs,
             autorestartOnCrash: request.autorestartOnCrash,
             ownerUID: ownerUID,
@@ -120,8 +115,6 @@ public struct RequestValidator: Sendable {
             arguments.append("-c")
             arguments.append(path)
         }
-        arguments.append("-p")
-        arguments.append("\(listenAddress):\(request.tcpPort)")
         arguments.append("--no-wait")
         arguments.append(contentsOf: request.extraArgs)
         return arguments

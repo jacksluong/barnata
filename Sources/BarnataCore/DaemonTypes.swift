@@ -11,20 +11,17 @@ public enum KanataState: String, Codable, Sendable {
 public struct StartRequest: Codable, Sendable, Equatable {
     public var presetName: String
     public var configPaths: [String]
-    public var tcpPort: Int
     public var extraArgs: [String]
     public var autorestartOnCrash: Bool
 
     public init(
         presetName: String,
         configPaths: [String],
-        tcpPort: Int,
         extraArgs: [String] = [],
         autorestartOnCrash: Bool = false
     ) {
         self.presetName = presetName
         self.configPaths = configPaths
-        self.tcpPort = tcpPort
         self.extraArgs = extraArgs
         self.autorestartOnCrash = autorestartOnCrash
     }

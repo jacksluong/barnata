@@ -36,7 +36,8 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
         let supervisor = ProcessSupervisor(
             configuration: ProcessSupervisor.Configuration(
                 executablePath: layout.kanataURL.path,
-                requirement: teamID.map { barnataCodeSigningRequirement(teamID: $0, identifier: barnataKanataIdentifier) }
+                requirement: teamID.map { barnataCodeSigningRequirement(teamID: $0, identifier: barnataKanataIdentifier) },
+                allocatePort: { PortAllocator.allocate() }
             ),
             spawner: spawner,
             logWriter: logWriter,

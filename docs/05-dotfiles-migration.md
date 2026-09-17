@@ -4,26 +4,9 @@ Repo `~/Developer/dotfiles`, chezmoi source root `home/`. Every path below is re
 
 ## Files to add
 
-- `dot_config/barnata/config.toml`: the full example from `02-config-format.md`.
-- `dot_config/barnata/icons/status-icons/*.png`: only if the bundled status icons need overriding. Layer icons are SF Symbols set in the settings window, so the nine layer PNGs from `private_Library/private_Application Support/kanata-tray/icons/` are not carried over.
-- `.chezmoiscripts/run_once_after_46-barnata-install.sh`: installs or upgrades the app from the public GitHub release, or from the Homebrew cask in `04-distribution.md`.
-
-  ```bash
-  #!/bin/bash
-  set -euo pipefail
-
-  if [[ -d /Applications/Barnata.app ]]; then
-    exit 0
-  fi
-
-  echo "==> Installing Barnata"
-  tmp="$(mktemp -d)"
-  gh release download --repo jacksluong/barnata --pattern 'Barnata-*.zip' --dir "$tmp" --clobber
-  ditto -x -k "$tmp"/Barnata-*.zip /Applications
-  rm -rf "$tmp"
-  ```
-
-- `.chezmoiscripts/run_once_after_47-kanata-tray-cleanup.sh`: removes the old setup on machines that had it. Idempotent; exits 0 when nothing is present.
+- `dot_config/barnata/config.toml`: the layout in `02-config-format.md`, one `Default` preset pointing at `~/.config/kanata/kanata.kbd`.
+- `dot_config/barnata/icons/status-icons/*.png`: only if the bundled status icons need overriding. Layer icons are SF Symbols, so the nine layer PNGs from `private_Library/private_Application Support/kanata-tray/icons/` are not carried over.
+- `.chezmoiscripts/run_once_after_40-kanata-tray-cleanup.sh`: removes the old setup on machines that had it. Idempotent; exits 0 when nothing is present.
 
   ```bash
   #!/bin/bash
@@ -52,32 +35,41 @@ Repo `~/Developer/dotfiles`, chezmoi source root `home/`. Every path below is re
   rm -rf "$HOME/Library/Application Support/kanata-tray"
   ```
 
-- `.chezmoiscripts/run_onchange_after_49-barnata-launch.sh.tmpl`: launches the app after the config changes.
+- `.chezmoiscripts/run_onchange_after_50-barnata-launch.sh.tmpl`: launches the app after the config changes.
 
   ```bash
   #!/bin/bash
-  # config hash: {{ include "dot_config/barnata/config.toml" | sha256sum }}
+  # config.toml hash: {{ include (joinPath .chezmoi.sourceDir "dot_config/barnata/config.toml") | sha256sum }}
   set -euo pipefail
+
   if [[ -d /Applications/Barnata.app ]]; then
     echo "==> Launching Barnata"
     open -a Barnata
+  else
+    echo "barnata-launch: /Applications/Barnata.app is missing, skipping" >&2
   fi
   ```
+
+Installing the app needs no script of its own. `run_onchange_before_30-brew-packages.sh.tmpl` already runs `brew bundle`, which installs the cask.
 
 ## Files to remove
 
 - `private_Library/LaunchAgents/com.kanata-tray.plist`
 - `private_Library/private_Application Support/kanata-tray/` (whole directory)
-- `.chezmoiscripts/run_onchange_after_48-kanata-sudoers.sh.tmpl`
-- `.chezmoiscripts/run_onchange_after_50-reload-launchagents.sh.tmpl` if no plists remain under `private_Library/LaunchAgents/`
+- `.chezmoiscripts/run_onchange_after_40-kanata-sudoers.sh.tmpl`
+- `.chezmoiscripts/run_onchange_after_50-launchagents.sh.tmpl`, since no plists remain under `private_Library/LaunchAgents/`
 
 ## Brewfile
 
 ```
++ tap "jacksluong/tap"
 - brew "kanata-tray"
++ cask "barnata"
 ```
 
-Keep `brew "kanata"`. It is used for editing and `kanata --check` from the shell and is not executed by Barnata. Add `cask "barnata"` from the tap in `04-distribution.md`.
+Keep `brew "kanata"`. It is used for editing and `kanata --check` from the shell and is not executed by Barnata.
+
+`HOMEBREW_BUNDLE_NO_UPGRADE=1` is set in the brew script, so `brew bundle` installs Barnata but never upgrades it. `brew upgrade --cask barnata` is the upgrade path.
 
 Karabiner-Elements is not in the Brewfile and stays optional. Barnata installs and runs the virtual HID driver itself when Karabiner-Elements is absent.
 
@@ -88,20 +80,23 @@ Barnata writes `launch_at_login` and `show_dock_icon` back into `config.toml` wh
 ## Script order after the change
 
 ```
-run_once_before_00-install-homebrew.sh
-run_once_before_05-home-dirs.sh
-run_onchange_before_10-brew-bundle.sh.tmpl
-run_once_before_20-install-tools.sh
-run_once_after_25-ssh-keys.sh.tmpl
-run_once_after_30-vim-plugins.sh
-run_once_after_45-dotfiles-git-hooks.sh
-run_once_after_46-barnata-install.sh              new
-run_once_after_47-kanata-tray-cleanup.sh          new
-run_onchange_after_49-barnata-launch.sh.tmpl    new
-run_once_after_99-manual-steps.sh                 text updated
+run_once_before_10-homebrew.sh
+run_once_before_20-developer-dir.sh
+run_onchange_before_30-brew-packages.sh.tmpl       installs the cask
+run_once_before_40-ssh-github.sh.tmpl
+run_once_before_50-standalone-tools.sh
+run_once_after_10-vim-plugins.sh
+run_once_after_20-clone-repos.sh.tmpl
+run_after_30-dotfiles-repo.sh.tmpl
+run_once_after_40-kanata-tray-cleanup.sh           new, replaces 40-kanata-sudoers
+run_onchange_after_50-barnata-launch.sh.tmpl       new, replaces 50-launchagents
+run_after_60-ai-skills.sh
+run_onchange_after_70-mas-apps.sh.tmpl
+run_once_after_80-macos-shortcuts.sh.tmpl
+run_once_after_90-manual-steps.sh.tmpl             text updated
 ```
 
-## `run_once_after_99-manual-steps.sh` replacement text for the kanata section
+## `run_once_after_90-manual-steps.sh.tmpl` replacement text for the kanata section
 
 ```
   * Barnata: it launched at the end of `chezmoi apply`. Finish in
@@ -117,21 +112,18 @@ run_once_after_99-manual-steps.sh                 text updated
 ## README.md keyboard section replacement
 
 ```
-[kanata](https://github.com/jtroo/kanata) remaps the built-in MacBook
-keyboard to a Canary layout with home-row mods and nine layers (typing,
-arrows, numbers, launcher, system, navcode, modnums, nohrm). The config is
-`home/dot_config/kanata/canary.kbd`.
-
-[Barnata](https://github.com/jacksluong/barnata) runs it as a root
-launchd daemon and shows a per-layer icon in the menu bar. Presets and
-icons are in `home/dot_config/barnata/config.toml`, editable from the
-app's Preferences window. First launch asks for one admin approval and
-the Accessibility grant for the app.
+[Barnata](https://github.com/jacksluong/barnata) runs it as a root launchd
+daemon and shows a per-layer icon in the menu bar. Presets and icons are in
+`home/dot_config/barnata/config.toml`, editable from the app's Preferences
+window. First launch asks for one admin approval and the Accessibility grant
+for the app.
 ```
 
 ## Order of operations on this machine
 
-1. Ship Barnata 0.1.0 as a GitHub release.
-2. Apply the dotfiles change. The cleanup script asks for sudo once to delete the sudoers file. That is the last sudo prompt.
-3. Finish the Permissions rows in Preferences.
-4. Confirm `/etc/sudoers.d` is empty, `launchctl list | grep kanata-tray` is empty, and `ps aux | grep kanata` shows one `kanata` under `barnata-daemon`.
+1. Make `jacksluong/barnata` public.
+2. `Scripts/release.sh 0.1.0` to ship 0.1.0 and bump the cask.
+3. Push `jacksluong/homebrew-tap`.
+4. Apply the dotfiles change. The cleanup script asks for sudo once to delete the sudoers file. That is the last sudo prompt.
+5. Finish the Permissions rows in Preferences.
+6. Confirm `/etc/sudoers.d` is empty, `launchctl list | grep kanata-tray` is empty, and `ps aux | grep kanata` shows one `kanata` under `barnata-daemon`.

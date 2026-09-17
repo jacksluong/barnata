@@ -43,10 +43,10 @@ final class ConfigWriterTests: XCTestCase {
         launch_at_login = false
 
         [defaults]
-        tcp_port = 5829
+        autorestart_on_crash = false
 
         [presets."Default"]
-        kanata_config = "~/.config/kanata/canary.kbd"
+        kanata_config = "~/.config/kanata/example.kbd"
         autorun = true
         """
         let result = ConfigWriter.setting(.launchAtLogin, to: true, in: text)
@@ -62,7 +62,7 @@ final class ConfigWriterTests: XCTestCase {
         launch_at_login = true
 
         [defaults]
-        tcp_port = 5829
+        autorestart_on_crash = false
         """
         XCTAssertEqual(
             ConfigWriter.setting(.showDockIcon, to: true, in: text),
@@ -72,23 +72,23 @@ final class ConfigWriterTests: XCTestCase {
             show_dock_icon = true
 
             [defaults]
-            tcp_port = 5829
+            autorestart_on_crash = false
             """
         )
     }
 
     func testAppendsToAnEmptyAppTable() {
-        let text = "[app]\n\n[defaults]\ntcp_port = 5829"
+        let text = "[app]\n\n[defaults]\nautorestart_on_crash = false"
         XCTAssertEqual(
             ConfigWriter.setting(.showDockIcon, to: true, in: text),
-            "[app]\nshow_dock_icon = true\n\n[defaults]\ntcp_port = 5829"
+            "[app]\nshow_dock_icon = true\n\n[defaults]\nautorestart_on_crash = false"
         )
     }
 
     func testInsertsTheAppTableAtTheTopWhenItIsMissing() {
         let text = """
         [defaults]
-        tcp_port = 5829
+        autorestart_on_crash = false
         """
         XCTAssertEqual(
             ConfigWriter.setting(.showDockIcon, to: true, in: text),
@@ -97,7 +97,7 @@ final class ConfigWriterTests: XCTestCase {
             show_dock_icon = true
 
             [defaults]
-            tcp_port = 5829
+            autorestart_on_crash = false
             """
         )
     }

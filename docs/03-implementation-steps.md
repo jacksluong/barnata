@@ -98,7 +98,7 @@ Phase 4 proper:
 - Fresh install flow on this machine: launch, approve daemon once with password, grant Accessibility to the app, autorun preset starts, layer icon changes when switching layers on the keyboard.
 - Quit the app; kanata stops and typing is no longer remapped. Relaunch; the autorun preset starts again.
 - Stop kanata and start the preset again five times over; the Layers submenu and the layer icon come back every time.
-- Edit `canary.kbd`, choose Reload config, `ConfigFileReload` arrives and the icon flashes.
+- Edit `example.kbd`, choose Reload config, `ConfigFileReload` arrives and the icon flashes.
 - Set `show_dock_icon = true` in the file, the Dock icon appears within a second. Set it back, it disappears. Toggle it from the menu, the file changes and the watcher does not reload twice.
 - Toggle Launch at login, the app appears under System Settings > Login Items.
 - Break the config file syntax, menu shows the error, fix it, menu recovers.
@@ -109,8 +109,8 @@ Phase 4 proper:
 - `Scripts/build-app.sh`: `swift build -c release` (`arm64`), assemble the bundle layout in `01-architecture.md`, write `Info.plist` with `CFBundleVersion` and `CFBundleShortVersionString` from `git describe`, copy `daemon.plist`, `kanata`, `driver.pkg`, resources. `--debug` builds debug and signs without `--timestamp`.
 - `Scripts/sign.sh`: sign inside-out with `--options runtime` (`--timestamp` unless `--debug`): `kanata`, `barnata-daemon`, `Barnata` executable, then the bundle. Verify with `codesign --verify --deep --strict`.
 - One-time before the first notarization: create an app-specific password at appleid.apple.com > Sign-In and Security > App-Specific Passwords, then `xcrun notarytool store-credentials barnata --apple-id <apple id> --team-id EE3526PL64` and paste it when prompted. The password is stored in the keychain under the profile name `barnata` and never appears in a script.
-- `Scripts/notarize.sh`: `ditto -c -k --keepParent` to zip, `xcrun notarytool submit --keychain-profile barnata --wait`, `xcrun stapler staple`, re-zip.
-- `Scripts/release.sh`: runs build, sign, notarize, tags, uploads `Barnata-<version>.zip` with `gh release create`, prints the sha256.
+- `Scripts/notarize.sh`: `ditto -c -k --keepParent` to zip, `xcrun notarytool submit --keychain-profile barnata --wait`, `xcrun stapler staple`, re-zip, print the sha256. The version comes from the built `Info.plist`.
+- `Scripts/release.sh <version>`: tags first, since `build-app.sh` reads the version back out of `git describe`, then builds, notarizes, pushes the tag, uploads `Barnata-<version>.zip` with `gh release create`, and bumps the cask in `TAP_DIR`. `--dry-run` stops after notarization and deletes the tag.
 
 Acceptance: `spctl --assess --type execute --verbose build/Barnata.app` prints `accepted, source=Notarized Developer ID`. Copying the zip to a second Mac and opening it shows no Gatekeeper warning.
 
@@ -118,12 +118,14 @@ Acceptance: `spctl --assess --type execute --verbose build/Barnata.app` prints `
 
 Follow `04-distribution.md` and `05-dotfiles-migration.md`. Then run `06-verification.md` end to end on this machine after removing kanata-tray.
 
+Distribution is the Homebrew cask only. The zip stays the release asset because the cask downloads it.
+
+Three steps need the repo to be public and are left to the user: making it public, `Scripts/release.sh 0.1.0`, and pushing `jacksluong/homebrew-tap`. The dotfiles change and the cask itself are already written.
+
 ## Deferred
 
 - Pre-login remapping (daemon starts the last preset at boot from a root-owned state file under `/Library/Application Support/Barnata/`).
 - Hooks running in the app.
-- Settings window.
 - CI release workflow.
 - Homebrew tap, once the repo is public.
 - Multi-user support.
-- Uninstall command (`Barnata.app/Contents/MacOS/Barnata --uninstall` that unregisters the daemon and login item and removes logs).

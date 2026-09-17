@@ -72,7 +72,7 @@ func runningState(layer: String? = "base") -> MenuState {
         status: daemonStatus(
             state: .running,
             presetName: "Default",
-            configPaths: ["/Users/test/.config/kanata/canary.kbd"],
+            configPaths: ["/Users/test/.config/kanata/example.kbd"],
             tcpPort: 5829,
             ownerUID: testUID
         ),

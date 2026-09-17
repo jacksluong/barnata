@@ -33,7 +33,6 @@ launch_at_login = true
 show_dock_icon = false
 
 [defaults]
-tcp_port = 5829
 autorestart_on_crash = false
 
 [defaults.layer_icons]
@@ -49,6 +48,6 @@ nohrm    = "nohrm.png"
 "*"      = "default.png"
 
 [presets."Default"]
-kanata_config = "~/.config/kanata/canary.kbd"
+kanata_config = "~/.config/kanata/example.kbd"
 autorun = true
 """

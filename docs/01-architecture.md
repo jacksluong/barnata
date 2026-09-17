@@ -248,7 +248,7 @@ The status item uses `NSStatusItem.squareLength`, so its width never changes. Ev
 Layer icons are SF Symbols from `IconCatalog` in `BarnataCore`. A `layer_icons` value outside that pool draws `exclamationmark.triangle.fill` in the status item and is flagged in the settings window.
 
 ```
-Barnata: Running (canary.kbd, layer: base)     disabled title line
+Barnata: Running (example.kbd, layer: base)     disabled title line
 ------------------------------------------------
 Presets
   ✓ Default                                       click to start, or stop when running

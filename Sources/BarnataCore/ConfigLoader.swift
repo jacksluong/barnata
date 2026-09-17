@@ -14,10 +14,37 @@ public enum ConfigLoader {
         return home.appending(path: ".config/barnata/config.toml")
     }
 
+    /// Written to a config path that has no file yet, so a fresh install has something to read and edit
+    public static let template = """
+    [app]
+    show_dock_icon = false
+
+    [defaults]
+    autorestart_on_crash = false
+
+    """
+
+    /// Creates the config file and its directory when absent. Returns true when a file was written.
+    @discardableResult
+    public static func createIfMissing(at url: URL) -> Bool {
+        guard !FileManager.default.fileExists(atPath: url.path) else { return false }
+        do {
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try template.write(to: url, atomically: true, encoding: .utf8)
+            return true
+        } catch {
+            return false
+        }
+    }
+
     public static func load(
         from url: URL,
         home: URL = FileManager.default.homeDirectoryForCurrentUser
     ) throws -> Config {
+        createIfMissing(at: url)
         let text: String
         do {
             text = try String(contentsOf: url, encoding: .utf8)
@@ -72,9 +99,8 @@ public enum ConfigLoader {
 
     private static func parseDefaults(_ reader: TableReader?) throws -> PresetDefaults {
         guard let reader else { return PresetDefaults() }
-        try reader.rejectUnknownKeys(["tcp_port", "autorestart_on_crash", "extra_args", "layer_icons"])
+        try reader.rejectUnknownKeys(["autorestart_on_crash", "extra_args", "layer_icons"])
         return PresetDefaults(
-            tcpPort: try reader.tcpPort(named: "tcp_port") ?? PresetDefaults.defaultTCPPort,
             autorestartOnCrash: try reader.bool(named: "autorestart_on_crash") ?? false,
             extraArgs: try reader.extraArgs(named: "extra_args") ?? [],
             layerIcons: try reader.stringTable(named: "layer_icons") ?? [:]
@@ -97,7 +123,7 @@ public enum ConfigLoader {
                 throw ConfigError(keyPath: "presets.\(name.tomlKeyPathSegment)", reason: "expected a table")
             }
             try preset.rejectUnknownKeys([
-                "kanata_config", "autorun", "tcp_port", "autorestart_on_crash", "extra_args", "layer_icons",
+                "kanata_config", "autorun", "autorestart_on_crash", "extra_args", "layer_icons",
             ])
 
             let rawPaths = try preset.stringOrStringArray(named: "kanata_config")
@@ -109,7 +135,6 @@ public enum ConfigLoader {
                 name: name,
                 configPaths: rawPaths.map { ConfigPath.expand($0, home: home, relativeTo: directory) },
                 autorun: try preset.bool(named: "autorun") ?? false,
-                tcpPort: try preset.tcpPort(named: "tcp_port") ?? defaults.tcpPort,
                 autorestartOnCrash: try preset.bool(named: "autorestart_on_crash") ?? defaults.autorestartOnCrash,
                 extraArgs: try preset.extraArgs(named: "extra_args") ?? defaults.extraArgs,
                 layerIcons: try preset.stringTable(named: "layer_icons") ?? defaults.layerIcons
@@ -164,15 +189,6 @@ private struct TableReader {
         guard let value = table[key] else { return nil }
         guard let result = value.string else { throw ConfigError(keyPath: path(key), reason: "expected a string") }
         return result
-    }
-
-    func tcpPort(named key: String) throws -> Int? {
-        guard let value = table[key] else { return nil }
-        guard let port = value.int else { throw ConfigError(keyPath: path(key), reason: "expected an integer") }
-        guard PresetDefaults.tcpPortRange.contains(port) else {
-            throw ConfigError(keyPath: path(key), reason: "must be between 1024 and 65535, got \(port)")
-        }
-        return port
     }
 
     func stringOrStringArray(named key: String) throws -> [String]? {

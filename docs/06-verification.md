@@ -35,11 +35,12 @@ Run in order on a machine that has never had Barnata or Karabiner-Elements. Item
 
 Install
 
-- [ ] The `gh release download` steps from `04-distribution.md` place the app in `/Applications` with no Gatekeeper warning on first open.
+- [ ] `brew install --cask jacksluong/tap/barnata` places the app in `/Applications` with no Gatekeeper warning on first open.
 - [ ] Opening the app from `~/Downloads` shows the "move to /Applications" alert and quits.
 
 First launch
 
+- [ ] With `~/.config/barnata/` absent, launching creates `config.toml` with `[app]` and `[defaults]`. The menu lists no presets and shows no config error.
 - [ ] Menu bar icon appears. No Dock icon.
 - [ ] Preferences opens the settings window. General shows "Background daemon" unapproved with an Approve button. Clicking opens Login Items. Approving asks for the admin password once.
 - [ ] After approval the row turns green within 5 s with the window still open.

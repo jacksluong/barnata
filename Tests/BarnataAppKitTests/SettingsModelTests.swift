@@ -216,12 +216,12 @@ final class SettingsModelTests: XCTestCase {
 
 final class UniqueNameTests: XCTestCase {
     func testTheFileStemBecomesTheLabel() {
-        XCTAssertEqual(SettingsModel.uniqueName(from: URL(fileURLWithPath: "/tmp/canary.kbd"), taken: []), "canary")
+        XCTAssertEqual(SettingsModel.uniqueName(from: URL(fileURLWithPath: "/tmp/example.kbd"), taken: []), "example")
     }
 
     func testACollisionGetsTheNextFreeNumber() {
-        let url = URL(fileURLWithPath: "/tmp/canary.kbd")
-        XCTAssertEqual(SettingsModel.uniqueName(from: url, taken: ["canary"]), "canary 2")
-        XCTAssertEqual(SettingsModel.uniqueName(from: url, taken: ["canary", "canary 2"]), "canary 3")
+        let url = URL(fileURLWithPath: "/tmp/example.kbd")
+        XCTAssertEqual(SettingsModel.uniqueName(from: url, taken: ["example"]), "example 2")
+        XCTAssertEqual(SettingsModel.uniqueName(from: url, taken: ["example", "example 2"]), "example 3")
     }
 }

@@ -105,36 +105,50 @@ struct NoValidation: BinaryValidating {
 
 func makeRequest(
     presetName: String = "Default",
-    configPaths: [String] = ["/Users/test/.config/kanata/canary.kbd"],
-    tcpPort: Int = 5829,
+    configPaths: [String] = ["/Users/test/.config/kanata/example.kbd"],
     extraArgs: [String] = [],
     autorestartOnCrash: Bool = false
 ) -> ValidatedStartRequest {
     ValidatedStartRequest(
         presetName: presetName,
         configPaths: configPaths,
-        tcpPort: tcpPort,
         extraArgs: extraArgs,
         autorestartOnCrash: autorestartOnCrash,
         ownerUID: callerUID,
-        arguments: ["-c", configPaths[0], "-p", "127.0.0.1:\(tcpPort)", "--no-wait"]
+        arguments: ["-c", configPaths[0], "--no-wait"]
     )
 }
 
 func makeSupervisor(
     spawner: FakeSpawner,
     scheduler: Scheduler,
-    terminationGrace: TimeInterval = 3
+    terminationGrace: TimeInterval = 3,
+    allocatePort: (@Sendable () -> Int)? = nil
 ) -> ProcessSupervisor {
     ProcessSupervisor(
         configuration: ProcessSupervisor.Configuration(
             executablePath: "/does/not/matter/kanata",
             requirement: nil,
-            terminationGrace: terminationGrace
+            terminationGrace: terminationGrace,
+            allocatePort: allocatePort
         ),
         spawner: spawner,
         validator: NoValidation(),
         logWriter: nil,
         scheduler: scheduler
     )
+}
+
+/// Hands out a fixed sequence of ports so a test can watch a restart pick a new one
+final class PortSequence: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [Int]
+
+    init(_ values: [Int]) { self.values = values }
+
+    func next() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return values.isEmpty ? 0 : values.removeFirst()
+    }
 }

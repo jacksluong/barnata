@@ -37,6 +37,35 @@ final class ProcessSupervisorTests: XCTestCase {
         XCTAssertEqual(supervisor.snapshot.ownerUID, callerUID)
     }
 
+    func testTheListenFlagComesFromTheAllocatorNotTheRequest() {
+        let ports = PortSequence([5829, 5830])
+        let supervisor = makeSupervisor(
+            spawner: spawner,
+            scheduler: scheduler,
+            allocatePort: { ports.next() }
+        )
+        let request = makeRequest()
+
+        supervisor.start(request)
+        XCTAssertEqual(spawner.spawnRequests[0].arguments, request.arguments + ["-p", "127.0.0.1:5829"])
+        XCTAssertEqual(supervisor.snapshot.tcpPort, 5829)
+
+        let first = spawner.lastPID
+        supervisor.restart()
+        spawner.exit(pid: first, reason: .signaled(signal: SIGTERM))
+        _ = supervisor.snapshot
+
+        XCTAssertEqual(spawner.spawnRequests[1].arguments, request.arguments + ["-p", "127.0.0.1:5830"])
+        XCTAssertEqual(supervisor.snapshot.tcpPort, 5830)
+    }
+
+    func testNoAllocatorMeansNoListenFlag() {
+        let request = makeRequest()
+        supervisor.start(request)
+        XCTAssertEqual(spawner.spawnRequests[0].arguments, request.arguments)
+        XCTAssertNil(supervisor.snapshot.tcpPort)
+    }
+
     func testExitZeroLeavesTheSupervisorIdle() {
         supervisor.start(makeRequest())
         deliverExit(.exited(code: 0))

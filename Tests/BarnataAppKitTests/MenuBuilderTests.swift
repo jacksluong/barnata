@@ -30,8 +30,8 @@ final class MenuTitleTests: XCTestCase {
             readyState(status: daemonStatus(state: .crashed, lastExitCode: 3)).title,
             "Crashed (exit 3)"
         )
-        XCTAssertEqual(runningState().title, "Running (canary.kbd, layer: base)")
-        XCTAssertEqual(runningState(layer: nil).title, "Running (canary.kbd)")
+        XCTAssertEqual(runningState().title, "Running (example.kbd, layer: base)")
+        XCTAssertEqual(runningState(layer: nil).title, "Running (example.kbd)")
     }
 
     func testAMissingGrantIsNamedInsteadOfTheExitCode() {
@@ -49,7 +49,7 @@ final class MenuTitleTests: XCTestCase {
     func testARunningKanataOutranksAStaleMissingGrant() {
         var running = runningState()
         running.hasAccessibility = false
-        XCTAssertEqual(running.title, "Running (canary.kbd, layer: base)")
+        XCTAssertEqual(running.title, "Running (example.kbd, layer: base)")
         XCTAssertEqual(running.presentation, .layer("base"))
     }
 
@@ -155,7 +155,7 @@ final class MenuBuilderTests: XCTestCase {
         let state = readyState(status: daemonStatus(
             state: .running,
             presetName: "Default",
-            configPaths: ["/Users/other/.config/kanata/canary.kbd"],
+            configPaths: ["/Users/other/.config/kanata/example.kbd"],
             tcpPort: 5829,
             ownerUID: otherUID
         ))

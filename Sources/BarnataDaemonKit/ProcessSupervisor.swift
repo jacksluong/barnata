@@ -22,19 +22,23 @@ public final class ProcessSupervisor: @unchecked Sendable {
         public var terminationGrace: TimeInterval
         public var stderrTailLines: Int
         public var backoff: BackoffPolicy
+        /// Set for kanata, nil for a child that takes no listen flag
+        public var allocatePort: (@Sendable () -> Int)?
 
         public init(
             executablePath: String,
             requirement: String?,
             terminationGrace: TimeInterval = 3,
             stderrTailLines: Int = 20,
-            backoff: BackoffPolicy = BackoffPolicy()
+            backoff: BackoffPolicy = BackoffPolicy(),
+            allocatePort: (@Sendable () -> Int)? = nil
         ) {
             self.executablePath = executablePath
             self.requirement = requirement
             self.terminationGrace = terminationGrace
             self.stderrTailLines = stderrTailLines
             self.backoff = backoff
+            self.allocatePort = allocatePort
         }
     }
 
@@ -50,6 +54,7 @@ public final class ProcessSupervisor: @unchecked Sendable {
     private var backoff: BackoffPolicy
     private var state: KanataState = .idle
     private var currentPID: pid_t?
+    private var currentPort: Int?
     private var request: ValidatedStartRequest?
     private var lastExitCode: Int32?
     private var lastError: String?
@@ -166,9 +171,11 @@ public final class ProcessSupervisor: @unchecked Sendable {
         stderrPartial = ""
         transition(to: .starting)
 
+        // A fresh port every spawn, so a restart never reuses one something else has taken
+        currentPort = configuration.allocatePort?()
         let spawnRequest = SpawnRequest(
             executablePath: configuration.executablePath,
-            arguments: request.arguments,
+            arguments: currentPort.map(request.arguments(listeningOn:)) ?? request.arguments,
             environment: SpawnRequest.daemonChildEnvironment
         )
 
@@ -309,7 +316,7 @@ public final class ProcessSupervisor: @unchecked Sendable {
             pid: currentPID,
             presetName: request?.presetName,
             configPaths: request?.configPaths ?? [],
-            tcpPort: request?.tcpPort,
+            tcpPort: currentPort,
             ownerUID: request?.ownerUID,
             lastExitCode: lastExitCode,
             lastError: lastError,

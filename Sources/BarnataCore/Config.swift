@@ -29,21 +29,15 @@ public struct AppSettings: Sendable, Equatable {
 }
 
 public struct PresetDefaults: Sendable, Equatable {
-    public static let defaultTCPPort = 5829
-    public static let tcpPortRange = 1024...65535
-
-    public var tcpPort: Int
     public var autorestartOnCrash: Bool
     public var extraArgs: [String]
     public var layerIcons: [String: String]
 
     public init(
-        tcpPort: Int = PresetDefaults.defaultTCPPort,
         autorestartOnCrash: Bool = false,
         extraArgs: [String] = [],
         layerIcons: [String: String] = [:]
     ) {
-        self.tcpPort = tcpPort
         self.autorestartOnCrash = autorestartOnCrash
         self.extraArgs = extraArgs
         self.layerIcons = layerIcons
@@ -56,7 +50,6 @@ public struct Preset: Sendable, Equatable {
     public var name: String
     public var configPaths: [String]
     public var autorun: Bool
-    public var tcpPort: Int
     public var autorestartOnCrash: Bool
     public var extraArgs: [String]
     public var layerIcons: [String: String]
@@ -65,7 +58,6 @@ public struct Preset: Sendable, Equatable {
         name: String,
         configPaths: [String],
         autorun: Bool = false,
-        tcpPort: Int = PresetDefaults.defaultTCPPort,
         autorestartOnCrash: Bool = false,
         extraArgs: [String] = [],
         layerIcons: [String: String] = [:]
@@ -73,7 +65,6 @@ public struct Preset: Sendable, Equatable {
         self.name = name
         self.configPaths = configPaths
         self.autorun = autorun
-        self.tcpPort = tcpPort
         self.autorestartOnCrash = autorestartOnCrash
         self.extraArgs = extraArgs
         self.layerIcons = layerIcons
@@ -86,7 +77,6 @@ public struct Preset: Sendable, Equatable {
         StartRequest(
             presetName: name,
             configPaths: configPaths,
-            tcpPort: tcpPort,
             extraArgs: extraArgs,
             autorestartOnCrash: autorestartOnCrash
         )

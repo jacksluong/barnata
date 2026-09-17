@@ -58,7 +58,6 @@ public final class DriverManager: @unchecked Sendable {
         let request = ValidatedStartRequest(
             presetName: "Karabiner-VirtualHIDDevice-Daemon",
             configPaths: [],
-            tcpPort: 0,
             extraArgs: [],
             autorestartOnCrash: true,
             ownerUID: 0,

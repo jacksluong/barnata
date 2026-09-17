@@ -4,17 +4,16 @@ import XCTest
 @testable import BarnataDaemonKit
 
 final class RequestValidatorTests: XCTestCase {
-    private let goodPath = "/Users/test/.config/kanata/canary.kbd"
+    private let goodPath = "/Users/test/.config/kanata/example.kbd"
 
     private func validator(_ files: [String: FileFacts]) -> RequestValidator {
         RequestValidator(inspector: FakeFileInspector(files: files))
     }
 
-    private func request(configPaths: [String]? = nil, tcpPort: Int = 5829, extraArgs: [String] = []) -> StartRequest {
+    private func request(configPaths: [String]? = nil, extraArgs: [String] = []) -> StartRequest {
         StartRequest(
             presetName: "Default",
             configPaths: configPaths ?? [goodPath],
-            tcpPort: tcpPort,
             extraArgs: extraArgs
         )
     }
@@ -38,13 +37,13 @@ final class RequestValidatorTests: XCTestCase {
     func testAValidRequestIsAccepted() throws {
         let validated = try validator([goodPath: .regularFile()]).validate(request(), ownerUID: callerUID)
         XCTAssertEqual(validated.ownerUID, callerUID)
-        XCTAssertEqual(validated.arguments, ["-c", goodPath, "-p", "127.0.0.1:5829", "--no-wait"])
+        XCTAssertEqual(validated.arguments, ["-c", goodPath, "--no-wait"])
     }
 
     func testExtraArgumentsFollowTheDaemonsOwnArguments() throws {
         let validated = try validator([goodPath: .regularFile()])
             .validate(request(extraArgs: ["--debug"]), ownerUID: callerUID)
-        XCTAssertEqual(validated.arguments, ["-c", goodPath, "-p", "127.0.0.1:5829", "--no-wait", "--debug"])
+        XCTAssertEqual(validated.arguments, ["-c", goodPath, "--no-wait", "--debug"])
     }
 
     func testEveryConfigPathBecomesItsOwnFlag() throws {
@@ -56,10 +55,10 @@ final class RequestValidatorTests: XCTestCase {
 
     func testRelativePathIsRejected() {
         assertRejected(
-            request(configPaths: ["canary.kbd"]),
-            files: ["canary.kbd": .regularFile()],
+            request(configPaths: ["example.kbd"]),
+            files: ["example.kbd": .regularFile()],
             rule: "config path must be absolute",
-            detailContains: "canary.kbd is relative"
+            detailContains: "example.kbd is relative"
         )
     }
 
@@ -103,24 +102,6 @@ final class RequestValidatorTests: XCTestCase {
     func testFileOwnedByAnotherUserIsAcceptedWhenWorldReadable() throws {
         let files = [goodPath: FileFacts.regularFile(ownedBy: otherUID, worldReadable: true)]
         XCTAssertNoThrow(try validator(files).validate(request(), ownerUID: callerUID))
-    }
-
-    func testPortBelowTheRangeIsRejected() {
-        assertRejected(
-            request(tcpPort: 80),
-            files: [goodPath: .regularFile()],
-            rule: "tcp port out of range",
-            detailContains: "80 is outside 1024...65535"
-        )
-    }
-
-    func testPortAboveTheRangeIsRejected() {
-        assertRejected(
-            request(tcpPort: 70000),
-            files: [goodPath: .regularFile()],
-            rule: "tcp port out of range",
-            detailContains: "70000 is outside 1024...65535"
-        )
     }
 
     func testDisallowedFlagIsRejected() {
