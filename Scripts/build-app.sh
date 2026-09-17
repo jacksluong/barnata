@@ -50,6 +50,15 @@ cat > "${CONTENTS}/Resources/driver-requirements.json" <<EOF
 }
 EOF
 
+cp "${REPO_ROOT}/LICENSE" "${CONTENTS}/Resources/LICENSE"
+TOMLKIT_VERSION="$(jq -r '.pins[] | select(.identity == "tomlkit") | .state.version' "${REPO_ROOT}/Package.resolved")"
+TOMLPP_VERSION="$(awk '/#define TOML_LIB_MAJOR/ { major = $3 } /#define TOML_LIB_MINOR/ { minor = $3 } /#define TOML_LIB_PATCH/ { patch = $3; print major "." minor "." patch; exit }' \
+  "${REPO_ROOT}/.build/checkouts/TOMLKit/Sources/CTOML/Sources/toml.hpp")"
+[[ -n "$TOMLKIT_VERSION" && -n "$TOMLPP_VERSION" ]] || { echo "could not resolve TOMLKit or toml++ version for the notices" >&2; exit 1; }
+sed -e "s/__KANATA_VERSION__/${KANATA_VERSION}/g" -e "s/__DRIVER_VERSION__/${DRIVER_VERSION}/g" \
+  -e "s/__TOMLKIT_VERSION__/${TOMLKIT_VERSION}/g" -e "s/__TOMLPP_VERSION__/${TOMLPP_VERSION}/g" \
+  "${REPO_ROOT}/THIRD-PARTY-NOTICES.md" > "${CONTENTS}/Resources/THIRD-PARTY-NOTICES.md"
+
 if [[ -d "${REPO_ROOT}/Resources/status-icons" ]]; then
   cp -R "${REPO_ROOT}/Resources/status-icons" "${CONTENTS}/Resources/status-icons"
 fi

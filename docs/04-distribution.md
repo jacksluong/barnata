@@ -8,7 +8,7 @@
 | `Contents/MacOS/barnata-daemon` | `io.jackyluong.barnata.daemon` | `--options runtime --timestamp` |
 | `Contents/MacOS/Barnata` and the bundle | `io.jackyluong.barnata` | `--options runtime --timestamp` |
 
-All three use the same Developer ID Application identity. The daemon plist's `BundleProgram` target and the app must share the Team ID or `SMAppService` refuses registration. `Contents/Resources/*.pkg` is sealed as a resource and keeps its pqrs signature.
+All three use the same Developer ID Application identity. The daemon plist's `BundleProgram` target and the app must share the Team ID or `SMAppService` refuses registration. `Contents/Resources/*.pkg` is sealed as a resource and keeps its pqrs signature. `Contents/Resources/LICENSE` and `Contents/Resources/THIRD-PARTY-NOTICES.md` are sealed the same way.
 
 No entitlements files. The app is not sandboxed. Hardened runtime is on for every binary. `arm64` only.
 
@@ -49,9 +49,16 @@ On rejection, `xcrun notarytool log <id> --keychain-profile barnata` lists the o
 
 ## Release artifact
 
-`Barnata-<version>.zip` attached to a GitHub release on `jacksluong/barnata`. No dmg. No pkg. The repo is private; downloads need `gh` authentication.
+`Barnata-<version>.zip` attached to a GitHub release on `jacksluong/barnata`. No dmg. No pkg. The repo is public and the release asset downloads without authentication.
 
 ## Install on another Mac
+
+```
+brew install --cask jacksluong/tap/barnata
+open -a Barnata
+```
+
+Without Homebrew:
 
 ```
 gh release download --repo jacksluong/barnata --pattern 'Barnata-*.zip' --dir /tmp/barnata --clobber
@@ -59,7 +66,7 @@ ditto -x -k /tmp/barnata/Barnata-*.zip /Applications
 open -a Barnata
 ```
 
-The same three commands upgrade an existing install. `05-dotfiles-migration.md` wraps them in a chezmoi script.
+`brew upgrade --cask barnata` or the same three commands upgrade an existing install. `05-dotfiles-migration.md` wraps them in a chezmoi script.
 
 The bundle must run from `/Applications`. Running from `~/Downloads` is refused by the app with an alert that names `/Applications`.
 
@@ -67,7 +74,9 @@ The bundle must run from `/Applications`. Running from `~/Downloads` is refused 
 
 Install the new version over the old one. On launch the app runs the update flow in `01-architecture.md`: stop kanata, ask the old daemon to shut down, reconnect to the new one, restart the preset. No re-approval, no password.
 
-## Homebrew tap (deferred until the repo is public)
+## Homebrew tap
+
+A cask, not a formula. The released zip is already signed, notarized, and stapled.
 
 Repo `jacksluong/homebrew-tap`, file `Casks/barnata.rb`:
 
@@ -94,3 +103,20 @@ end
 ```
 
 `Scripts/release.sh` already prints the sha256. Bumping the cask is a manual commit to the tap.
+
+## Licensing
+
+Barnata is GPL-3.0, in `LICENSE` at the repo root.
+
+`Scripts/build-app.sh` copies `LICENSE` to `Contents/Resources/LICENSE` and renders `THIRD-PARTY-NOTICES.md` to `Contents/Resources/THIRD-PARTY-NOTICES.md`, substituting `__KANATA_VERSION__` and `__DRIVER_VERSION__` from `Scripts/vars.sh`, `__TOMLKIT_VERSION__` from `Package.resolved`, and `__TOMLPP_VERSION__` from the vendored `toml.hpp`.
+
+| Component | License | Obligation met by |
+|---|---|---|
+| Barnata | GPL-3.0 | `LICENSE` in the bundle, source at `jacksluong/barnata` |
+| kanata | LGPL-3.0 | LGPL-3.0 text in the notices, GPL-3.0 text in `LICENSE`, source link to the pinned tag next to the binary |
+| Karabiner-DriverKit-VirtualHIDDevice | Unlicense | Unlicense text in the notices |
+| TOMLKit and vendored toml++ | MIT | Copyright lines and MIT text in the notices |
+
+kanata is spawned as a separate process and driven over TCP. It is never linked, so LGPL-3.0 section 4 does not apply and Barnata stays a separate work. Linking kanata's library crate instead would change that.
+
+A kanata or driver version bump in `Scripts/vars.sh` moves the notices with it. A TOMLKit bump in `Package.resolved` does too. Neither needs an edit to `THIRD-PARTY-NOTICES.md`.

@@ -13,3 +13,11 @@ swift test
 ```
 
 `swift test` requires the Xcode toolchain, which `Scripts/vars.sh` selects through `DEVELOPER_DIR`.
+
+## License
+
+Barnata is licensed under the GNU General Public License version 3, in `LICENSE`.
+
+The bundled kanata binary, the bundled Karabiner driver installer, and the linked TOMLKit library
+keep their own licenses. See `THIRD-PARTY-NOTICES.md`, which ships inside the app bundle at
+`Contents/Resources/THIRD-PARTY-NOTICES.md` alongside a copy of `LICENSE`.

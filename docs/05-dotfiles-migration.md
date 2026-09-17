@@ -6,7 +6,7 @@ Repo `~/Developer/dotfiles`, chezmoi source root `home/`. Every path below is re
 
 - `dot_config/barnata/config.toml`: the full example from `02-config-format.md`.
 - `dot_config/barnata/icons/status-icons/*.png`: only if the bundled status icons need overriding. Layer icons are SF Symbols set in the settings window, so the nine layer PNGs from `private_Library/private_Application Support/kanata-tray/icons/` are not carried over.
-- `.chezmoiscripts/run_once_after_46-barnata-install.sh`: installs or upgrades the app from the private GitHub release. Requires `gh` to be authenticated, which an earlier script already ensures.
+- `.chezmoiscripts/run_once_after_46-barnata-install.sh`: installs or upgrades the app from the public GitHub release, or from the Homebrew cask in `04-distribution.md`.
 
   ```bash
   #!/bin/bash
@@ -77,7 +77,7 @@ Repo `~/Developer/dotfiles`, chezmoi source root `home/`. Every path below is re
 - brew "kanata-tray"
 ```
 
-Keep `brew "kanata"`. It is used for editing and `kanata --check` from the shell and is not executed by Barnata. Nothing is added; the cask arrives when the repo goes public.
+Keep `brew "kanata"`. It is used for editing and `kanata --check` from the shell and is not executed by Barnata. Add `cask "barnata"` from the tap in `04-distribution.md`.
 
 Karabiner-Elements is not in the Brewfile and stays optional. Barnata installs and runs the virtual HID driver itself when Karabiner-Elements is absent.
 
