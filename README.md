@@ -25,6 +25,8 @@ Inspired by [kanata-tray](https://github.com/rszyma/kanata-tray). Barnata handle
 brew install --cask jacksluong/tap/barnata
 ```
 
+Barnata checks GitHub for a newer release once a day. When one is out, **Update available** appears in the menu bar menu and at the bottom of the **General** tab. Running it quits Barnata, upgrades the cask with Homebrew, and opens the new version. The output goes to `~/Library/Logs/Barnata/update.log`.
+
 ## Usage
 
 Open Preferences from the menu bar icon.
@@ -61,6 +63,7 @@ Settings are stored in `~/.config/barnata/config.toml`, which you can also edit 
 [app]
 show_dock_icon = false
 launch_at_login = true
+check_for_updates = true      # daily check against the GitHub releases page
 status_icons = "my-icons"     # directory under ~/.config/barnata/icons
 
 [defaults]                    # inherited by presets that omit these keys

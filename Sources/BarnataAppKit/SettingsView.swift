@@ -74,6 +74,10 @@ private struct GeneralTab: View {
                         get: { model.showDockIcon },
                         set: { model.setShowDockIcon($0) }
                     ))
+                    Toggle("Check for updates", isOn: Binding(
+                        get: { model.checkForUpdates },
+                        set: { model.setCheckForUpdates($0) }
+                    ))
                 }
                 .toggleStyle(.switch)
             }
@@ -83,6 +87,10 @@ private struct GeneralTab: View {
                 Button("Uninstall Barnata", role: .destructive) { isConfirmingUninstall = true }
                     .disabled(model.isUninstalling)
                 Spacer()
+                if model.availableUpdate != nil {
+                    Button(model.isUpdating ? "Updating…" : "Update available") { model.showUpdate() }
+                        .disabled(model.isUpdating)
+                }
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)

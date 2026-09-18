@@ -34,6 +34,7 @@ final class SettingsModelTests: XCTestCase {
                     completion(.success)
                 },
                 setDockIconVisible: { _ in },
+                showUpdate: {},
                 configDidChange: { _ in }
             )
         )

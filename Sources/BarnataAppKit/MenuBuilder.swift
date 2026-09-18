@@ -6,6 +6,7 @@ public enum MenuBuilder {
     public static func entries(for state: MenuState) -> [MenuEntry] {
         var entries: [MenuEntry] = [.label("Barnata: \(state.title)")]
         entries.append(contentsOf: state.detailLines.map(MenuEntry.label))
+        entries.append(contentsOf: update(state))
         entries.append(.separator)
         entries.append(contentsOf: presets(state))
         entries.append(contentsOf: kanataControls(state))
@@ -15,6 +16,15 @@ public enum MenuBuilder {
         // Quitting always stops kanata, so no shortcut that could be hit by accident
         entries.append(.item(MenuItem(title: "Quit Barnata", action: .quit)))
         return entries
+    }
+
+    private static func update(_ state: MenuState) -> [MenuEntry] {
+        guard state.availableUpdate != nil else { return [] }
+        return [.item(MenuItem(
+            title: state.isUpdating ? "Updating…" : "Update available",
+            action: .showUpdate,
+            isEnabled: !state.isUpdating
+        ))]
     }
 
     private static func presets(_ state: MenuState) -> [MenuEntry] {

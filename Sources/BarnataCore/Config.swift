@@ -19,11 +19,18 @@ public struct Config: Sendable, Equatable {
 public struct AppSettings: Sendable, Equatable {
     public var launchAtLogin: Bool?
     public var showDockIcon: Bool
+    public var checkForUpdates: Bool
     public var statusIcons: String?
 
-    public init(launchAtLogin: Bool? = nil, showDockIcon: Bool = false, statusIcons: String? = nil) {
+    public init(
+        launchAtLogin: Bool? = nil,
+        showDockIcon: Bool = false,
+        checkForUpdates: Bool = true,
+        statusIcons: String? = nil
+    ) {
         self.launchAtLogin = launchAtLogin
         self.showDockIcon = showDockIcon
+        self.checkForUpdates = checkForUpdates
         self.statusIcons = statusIcons
     }
 }

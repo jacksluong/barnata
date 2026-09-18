@@ -182,6 +182,29 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(entries.item(titled: "Quit Barnata")?.action, .quit)
     }
 
+    func testAnAvailableUpdateSitsInTheTopSectionAboveTheFirstSeparator() {
+        var state = runningState()
+        XCTAssertNil(MenuBuilder.entries(for: state).item(titled: "Update available"))
+
+        state.availableUpdate = AvailableUpdate(version: "9.9.9")
+        let entries = MenuBuilder.entries(for: state)
+        let separator = entries.firstIndex { if case .separator = $0 { return true } else { return false } }
+        let item = entries.firstIndex { $0.item?.title == "Update available" }
+
+        XCTAssertEqual(item, 1)
+        XCTAssertEqual(separator, 2)
+        XCTAssertEqual(entries.item(titled: "Update available")?.action, .showUpdate)
+    }
+
+    func testTheUpdateItemSaysSoAndGoesDeadWhileHomebrewRuns() {
+        var state = runningState()
+        state.availableUpdate = AvailableUpdate(version: "9.9.9")
+        state.isUpdating = true
+
+        let item = MenuBuilder.entries(for: state).item(titled: "Updating\u{2026}")
+        XCTAssertEqual(item?.isEnabled, false)
+    }
+
     func testTheMenuOffersOneQuitAndNoAppLog() {
         let titles = MenuBuilder.entries(for: runningState()).allItems.map(\.title)
         XCTAssertEqual(titles.filter { $0.hasPrefix("Quit") }, ["Quit Barnata"])

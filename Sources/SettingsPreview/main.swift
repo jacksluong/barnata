@@ -14,6 +14,7 @@ let model = SettingsModel(
         activateDriver: { $0(.success) },
         stopKanata: { $0(.success) },
         setDockIconVisible: { _ in },
+        showUpdate: {},
         configDidChange: { _ in }
     )
 )

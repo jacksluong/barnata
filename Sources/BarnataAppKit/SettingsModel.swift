@@ -11,6 +11,7 @@ public struct SettingsActions {
     public var activateDriver: (@escaping (CommandResult) -> Void) -> Void
     public var stopKanata: (@escaping (CommandResult) -> Void) -> Void
     public var setDockIconVisible: (Bool) -> Void
+    public var showUpdate: () -> Void
     /// Called after the window writes config.toml, with the modification date the watcher should ignore
     public var configDidChange: (Date?) -> Void
 
@@ -19,12 +20,14 @@ public struct SettingsActions {
         activateDriver: @escaping (@escaping (CommandResult) -> Void) -> Void,
         stopKanata: @escaping (@escaping (CommandResult) -> Void) -> Void,
         setDockIconVisible: @escaping (Bool) -> Void,
+        showUpdate: @escaping () -> Void,
         configDidChange: @escaping (Date?) -> Void
     ) {
         self.installDriver = installDriver
         self.activateDriver = activateDriver
         self.stopKanata = stopKanata
         self.setDockIconVisible = setDockIconVisible
+        self.showUpdate = showUpdate
         self.configDidChange = configDidChange
     }
 }
@@ -78,6 +81,9 @@ public final class SettingsModel: ObservableObject {
 
     @Published public var launchAtLogin = false
     @Published public var showDockIcon = false
+    @Published public var checkForUpdates = true
+    @Published public var availableUpdate: AvailableUpdate?
+    @Published public var isUpdating = false
     @Published public var daemonApproved = false
     @Published public var hasAccessibility = false
     @Published public var driver: DriverStatus?
@@ -152,6 +158,7 @@ public final class SettingsModel: ObservableObject {
         hasAccessibility = setup.hasAccessibility
         launchAtLogin = setup.isLaunchAtLoginEnabled
         showDockIcon = config?.app.showDockIcon ?? false
+        checkForUpdates = config?.app.checkForUpdates ?? true
     }
 
     public func startPolling() {
@@ -280,6 +287,15 @@ public final class SettingsModel: ObservableObject {
         }
         apply { $0.set(.bool(value), forKey: ConfigWriter.Key.launchAtLogin.rawValue, inTable: [ConfigWriter.tableName]) }
         launchAtLogin = setup.isLaunchAtLoginEnabled
+    }
+
+    public func setCheckForUpdates(_ value: Bool) {
+        apply { $0.set(.bool(value), forKey: ConfigWriter.Key.checkForUpdates.rawValue, inTable: [ConfigWriter.tableName]) }
+        checkForUpdates = value
+    }
+
+    public func showUpdate() {
+        actions.showUpdate()
     }
 
     public func setShowDockIcon(_ value: Bool) {

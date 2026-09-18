@@ -35,6 +35,8 @@ public struct MenuState: Sendable, Equatable {
     public var lastActionError: String?
     public var launchAtLogin: Bool
     public var showDockIcon: Bool
+    public var availableUpdate: AvailableUpdate?
+    public var isUpdating: Bool
 
     public init(
         appVersion: String = "0",
@@ -51,7 +53,9 @@ public struct MenuState: Sendable, Equatable {
         lastReloadError: String? = nil,
         lastActionError: String? = nil,
         launchAtLogin: Bool = false,
-        showDockIcon: Bool = false
+        showDockIcon: Bool = false,
+        availableUpdate: AvailableUpdate? = nil,
+        isUpdating: Bool = false
     ) {
         self.appVersion = appVersion
         self.daemonApproved = daemonApproved
@@ -68,6 +72,8 @@ public struct MenuState: Sendable, Equatable {
         self.lastActionError = lastActionError
         self.launchAtLogin = launchAtLogin
         self.showDockIcon = showDockIcon
+        self.availableUpdate = availableUpdate
+        self.isUpdating = isUpdating
     }
 
     // MARK: - Derived facts

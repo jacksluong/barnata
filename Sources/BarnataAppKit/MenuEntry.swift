@@ -8,6 +8,7 @@ public enum MenuAction: Sendable, Hashable {
     case restartKanata
     case switchLayer(String)
     case reloadConfig
+    case showUpdate
     case openKanataLog
     case openPreferences
     case quit

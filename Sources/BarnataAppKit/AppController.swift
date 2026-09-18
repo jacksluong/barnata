@@ -21,6 +21,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private let configURL: URL
     private let watcher: ConfigWatcher
     private let launchState = LaunchState()
+    private let updateChecker = UpdateChecker(currentVersion: AppBundle.shortVersion)
 
     private var state = MenuState()
     private var config: Config?
@@ -58,6 +59,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         presetToStartAfterUpdate = launchState.presetToResume(currentVersion: state.appVersion)
         launchState.recordLaunch(version: state.appVersion)
 
+        updateChecker.onChange = { [weak self] update in self?.updateDidChange(update) }
         loadConfig()
         applyAppSettings()
 
@@ -76,6 +78,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         daemonClient.start()
         loadBundledKanataVersion()
         render()
+        reportLastUpdate()
     }
 
     /// The app has no main window, so a Dock click opens or raises the settings window
@@ -347,6 +350,12 @@ public final class AppController: NSObject, NSApplicationDelegate {
         guard let config else { return }
         state.showDockIcon = config.app.showDockIcon
         statusItem.setDockIconVisible(config.app.showDockIcon)
+        // A bare executable is not a bundle Homebrew can upgrade, so it is never offered one
+        if config.app.checkForUpdates, AppBundle.bundleURL != nil {
+            updateChecker.start()
+        } else {
+            updateChecker.stop()
+        }
         if let wanted = config.app.launchAtLogin, wanted != setup.isLaunchAtLoginEnabled {
             setup.setLaunchAtLogin(wanted)
         }
@@ -436,6 +445,9 @@ public final class AppController: NSObject, NSApplicationDelegate {
         case .reloadConfig:
             tcpClient.send(.reload)
 
+        case .showUpdate:
+            offerUpdate()
+
         case .openKanataLog:
             setup.open(AppBundle.kanataLogURL)
 
@@ -448,6 +460,40 @@ public final class AppController: NSObject, NSApplicationDelegate {
         render()
     }
 
+    // MARK: - Updates
+
+    private func updateDidChange(_ update: AvailableUpdate?) {
+        state.availableUpdate = update
+        if let update { log.notice("barnata \(update.version, privacy: .public) is available") }
+        render()
+    }
+
+    private func offerUpdate() {
+        guard let update = state.availableUpdate, !state.isUpdating else { return }
+        guard let bundle = AppBundle.bundleURL else { return }
+        guard UpdatePrompt.ask(about: update, currentVersion: AppBundle.shortVersion) == .update else { return }
+
+        if let message = UpdateInstaller.start(appBundle: bundle) {
+            log.error("cannot start the update: \(message, privacy: .public)")
+            UpdatePrompt.reportFailure(message)
+            return
+        }
+
+        state.isUpdating = true
+        render()
+        // Homebrew waits for this to finish before it touches the bundle, and opens the new one after
+        NSApp.terminate(nil)
+    }
+
+    /// Homebrew ran while the app was gone, so its exit code is read back on the next launch
+    private func reportLastUpdate() {
+        guard let code = UpdateInstaller.takeResult(), code != 0 else { return }
+        log.error("the last update exited with \(code)")
+        UpdatePrompt.reportFailure(
+            "Homebrew exited with code \(code). The output is in \(UpdateInstaller.logURL.abbreviatedPath)."
+        )
+    }
+
     // MARK: - Settings window
 
     private func showSettings() {
@@ -455,6 +501,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
         settings = controller
         controller.model.driver = state.driver
         controller.model.activePresetName = state.activePresetName
+        controller.model.availableUpdate = state.availableUpdate
+        controller.model.isUpdating = state.isUpdating
         controller.show()
     }
 
@@ -486,6 +534,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
                     self?.config?.app.showDockIcon = visible
                     self?.statusItem.setDockIconVisible(visible)
                 },
+                showUpdate: { [weak self] in self?.offerUpdate() },
                 configDidChange: { [weak self] modified in
                     guard let self else { return }
                     watcher.ignoreChange(modifiedAt: modified)
@@ -503,6 +552,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
         let preset = state.activePresetName.flatMap { config?.preset(named: $0) }
         settings?.model.driver = state.driver
         settings?.model.activePresetName = state.activePresetName
+        settings?.model.availableUpdate = state.availableUpdate
+        settings?.model.isUpdating = state.isUpdating
         statusItem.render(state, preset: preset)
     }
 }
