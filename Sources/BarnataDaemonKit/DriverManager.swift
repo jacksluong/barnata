@@ -66,6 +66,9 @@ public final class DriverManager: @unchecked Sendable {
         return supervisor.start(request)
     }
 
+    /// True only for a virtual HID daemon this daemon started
+    public var isRunningVirtualHIDDaemon: Bool { supervisor.isBusy }
+
     public func stopVirtualHIDDaemon() {
         supervisor.stop()
     }

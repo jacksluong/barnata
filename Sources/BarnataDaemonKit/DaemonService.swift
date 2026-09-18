@@ -69,10 +69,11 @@ final class DaemonService: NSObject, BarnataDaemonProtocol, @unchecked Sendable 
         reply(encode(supervisor.restart()))
     }
 
+    /// Replies once the children are really gone, so a quitting app can wait for it
     func shutdown(reply: @escaping (Data) -> Void) {
         log.notice("shutting down on request")
-        reply(encode(CommandResult.success))
         terminateChildren()
+        reply(encode(CommandResult.success))
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { exit(0) }
     }
 
@@ -100,9 +101,14 @@ final class DaemonService: NSObject, BarnataDaemonProtocol, @unchecked Sendable 
 
     // MARK: - Daemon lifecycle
 
-    /// True while kanata is running or a client is subscribed, which holds off the idle exit
-    var isBusy: Bool {
-        supervisor.isBusy || !queue.sync { subscribers.isEmpty }
+    /// True while the app holds a status subscription
+    var hasClients: Bool {
+        !queue.sync { subscribers.isEmpty }
+    }
+
+    /// True while kanata or the virtual HID daemon is running under this daemon
+    var hasRunningChildren: Bool {
+        supervisor.isBusy || driverManager.isRunningVirtualHIDDaemon
     }
 
     func terminateChildren() {

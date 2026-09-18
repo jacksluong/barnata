@@ -52,12 +52,7 @@ public enum MenuBuilder {
         }
 
         let liveControls = state.canControlKanata && state.isRunning
-        entries.append(.item(MenuItem(
-            title: "Reload config",
-            action: .reloadConfig,
-            isEnabled: liveControls,
-            keyEquivalent: "r"
-        )))
+        entries.append(.item(MenuItem(title: "Reload config", action: .reloadConfig, isEnabled: liveControls)))
 
         if state.activePresetSupportsCycling {
             entries.append(.item(MenuItem(title: "Next config file", action: .nextConfigFile, isEnabled: liveControls)))

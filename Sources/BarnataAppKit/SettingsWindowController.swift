@@ -6,6 +6,8 @@ import SwiftUI
 @MainActor
 public final class SettingsWindowController: NSObject, NSWindowDelegate, NSToolbarDelegate {
     static let frameAutosaveName = "BarnataSettings"
+    static let defaultContentSize = NSSize(width: 720, height: 520)
+    static let minimumContentSize = NSSize(width: 660, height: 420)
 
     public let model: SettingsModel
 
@@ -34,14 +36,17 @@ public final class SettingsWindowController: NSObject, NSWindowDelegate, NSToolb
 
     private func makeWindow() -> NSWindow {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+            contentRect: NSRect(origin: .zero, size: SettingsWindowController.defaultContentSize),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "Barnata Settings"
         window.contentViewController = NSHostingController(rootView: SettingsView(model: model))
-        window.contentMinSize = NSSize(width: 660, height: 420)
+        window.contentMinSize = SettingsWindowController.minimumContentSize
+        // The hosting controller shrinks the window to the SwiftUI view's own fitting size,
+        // so the content size is set back afterwards rather than in the initial frame
+        window.setContentSize(SettingsWindowController.defaultContentSize)
         window.isReleasedWhenClosed = false
         window.delegate = self
 

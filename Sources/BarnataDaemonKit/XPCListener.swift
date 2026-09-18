@@ -1,9 +1,11 @@
 import BarnataCore
 import Foundation
 
-/// Owns the Mach service listener, the supervisor, and the idle exit timer
+/// Owns the Mach service listener, the supervisor, and the exit timers
 public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
     public static let idleTimeout: TimeInterval = 60
+    /// How long a client has to come back before its children are torn down with it
+    public static let orphanGrace: TimeInterval = 3
     private static let idleCheckInterval: TimeInterval = 5
 
     private let listener: NSXPCListener
@@ -13,6 +15,8 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
     private let queue = DispatchQueue(label: "io.jackyluong.barnata.listener")
     private var idleSince: Date?
     private var idleTimer: DispatchSourceTimer?
+    private var orphanTimer: DispatchSourceTimer?
+    private var liveConnections = 0
 
     public override convenience init() {
         self.init(layout: BundleLayout(), machServiceName: barnataMachServiceName)
@@ -78,7 +82,7 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
     }
 
     public func noteActivity() {
-        queue.async { self.idleSince = nil }
+        queue.async { self.updateClientState() }
     }
 
     /// A daemon that died before its child did leaves a kanata holding the keyboard and the TCP port
@@ -99,14 +103,14 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
         connection.setCodeSigningRequirement(clientRequirement)
         connection.exportedInterface = NSXPCInterface(with: BarnataDaemonProtocol.self)
         connection.exportedObject = service
-        connection.invalidationHandler = { [weak self] in self?.noteActivity() }
+        connection.invalidationHandler = { [weak self] in self?.noteConnectionClosed() }
         connection.resume()
-        noteActivity()
+        noteConnectionOpened()
         log.info("accepted a connection from uid \(connection.effectiveUserIdentifier)")
         return true
     }
 
-    // MARK: - Idle exit
+    // MARK: - Exit timers
 
     private func startIdleTimer() {
         let timer = DispatchSource.makeTimerSource(queue: queue)
@@ -117,10 +121,7 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
     }
 
     private func checkIdle() {
-        guard !service.isBusy else {
-            idleSince = nil
-            return
-        }
+        guard !hasClients, !service.hasRunningChildren else { return }
         guard let since = idleSince else {
             idleSince = Date()
             return
@@ -129,6 +130,56 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
         log.notice("idle for \(XPCListener.idleTimeout, privacy: .public) s, exiting")
         service.terminateChildren()
         exit(0)
+    }
+
+    private func noteConnectionOpened() {
+        queue.async {
+            self.liveConnections += 1
+            self.updateClientState()
+        }
+    }
+
+    private func noteConnectionClosed() {
+        queue.async {
+            self.liveConnections = max(0, self.liveConnections - 1)
+            self.updateClientState()
+        }
+    }
+
+    /// Queue-confined: true while any app still holds a connection or a status subscription
+    private var hasClients: Bool { liveConnections > 0 || service.hasClients }
+
+    private func updateClientState() {
+        guard !hasClients else {
+            idleSince = nil
+            cancelOrphanTimer()
+            return
+        }
+        if idleSince == nil { idleSince = Date() }
+        startOrphanTimer()
+    }
+
+    /// A force quit or a crash takes the app's connections with it, and kanata outliving it
+    /// would leave the keyboard remapped with nothing left to unmap it
+    private func startOrphanTimer() {
+        guard orphanTimer == nil, service.hasRunningChildren else { return }
+        let timer = DispatchSource.makeTimerSource(queue: queue)
+        timer.schedule(deadline: .now() + XPCListener.orphanGrace)
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            cancelOrphanTimer()
+            guard !hasClients, service.hasRunningChildren else { return }
+            log.notice("the app is gone, stopping its children and exiting")
+            service.terminateChildren()
+            exit(0)
+        }
+        timer.resume()
+        orphanTimer = timer
+    }
+
+    private func cancelOrphanTimer() {
+        orphanTimer?.cancel()
+        orphanTimer = nil
     }
 
     private func installSignalHandlers() {

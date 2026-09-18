@@ -7,6 +7,8 @@ import Foundation
 public final class AppController: NSObject, NSApplicationDelegate {
     public static let setupPollInterval: TimeInterval = 5
     public static let reloadFlashDuration: TimeInterval = 2
+    /// How long quitting waits for the daemon to confirm before leaving anyway
+    public static let quitTimeout: TimeInterval = 5
 
     private let setup = SetupActions()
     private let statusItem = StatusItemController()
@@ -25,7 +27,10 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private var didRunUpdateFlow = false
     private var isRestartingDaemonForUpdate = false
     private var didAttemptAutostart = false
-    private var isStoppingKanataForQuit = false
+    private var isShuttingDownForQuit = false
+    private var didReplyToTerminate = false
+    private var quitTimer: Timer?
+    private var signalSources: [DispatchSourceSignal] = []
     private var didCheckKanataVersion = false
     private var presetToStartAfterUpdate: String?
 
@@ -55,6 +60,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         daemonClient.onEvent = onMain { [weak self] event in self?.handle(daemonEvent: event) }
         tcpClient.onEvent = onMain { [weak self] event in self?.handle(kanataEvent: event) }
 
+        installTerminationSignalHandlers()
         setup.registerDaemon()
         refreshSetupState()
         daemonClient.start()
@@ -62,14 +68,22 @@ public final class AppController: NSObject, NSApplicationDelegate {
         render()
     }
 
-    /// Quitting always stops kanata, so the keyboard is never left remapped by an absent app
+    /// Quitting takes kanata and the daemon with it, and waits for them to be gone, so the
+    /// keyboard is never left remapped by an absent app
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        guard !isStoppingKanataForQuit else { return .terminateNow }
-        isStoppingKanataForQuit = true
-        daemonClient.stopKanata(onMain { result in
-            if !result.ok { log.error("stop kanata on quit failed: \(result.message ?? "", privacy: .public)") }
-            NSApp.reply(toApplicationShouldTerminate: true)
+        guard !isShuttingDownForQuit else { return .terminateNow }
+        isShuttingDownForQuit = true
+
+        daemonClient.shutdownDaemon(onMain { [weak self] result in
+            if !result.ok { log.error("daemon shutdown on quit failed: \(result.message ?? "", privacy: .public)") }
+            self?.finishTerminating()
         })
+        quitTimer = Timer.scheduledTimer(withTimeInterval: AppController.quitTimeout, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                log.error("the daemon did not confirm its shutdown, quitting anyway")
+                self?.finishTerminating()
+            }
+        }
         return .terminateLater
     }
 
@@ -77,6 +91,27 @@ public final class AppController: NSObject, NSApplicationDelegate {
         watcher.stop()
         tcpClient.disconnect()
         daemonClient.stop()
+    }
+
+    private func finishTerminating() {
+        guard !didReplyToTerminate else { return }
+        didReplyToTerminate = true
+        quitTimer?.invalidate()
+        quitTimer = nil
+        // Stops the reconnect backoff from waking launchd and starting a fresh daemon
+        daemonClient.stop()
+        NSApp.reply(toApplicationShouldTerminate: true)
+    }
+
+    /// AppKit runs no terminate path for the signals that pkill, kill, and logout send
+    private func installTerminationSignalHandlers() {
+        for number in [SIGTERM, SIGINT, SIGHUP] {
+            signal(number, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
+            source.setEventHandler { MainActor.assumeIsolated { NSApp.terminate(nil) } }
+            source.resume()
+            signalSources.append(source)
+        }
     }
 
     // MARK: - Daemon
@@ -166,12 +201,16 @@ public final class AppController: NSObject, NSApplicationDelegate {
         guard !didAttemptAutostart, state.daemonApproved, !isRestartingDaemonForUpdate else { return }
         // kanata exits 1 on every attempt without the grant, so wait for it rather than churn
         guard state.missingPermission == nil else { return }
-        didAttemptAutostart = true
 
-        guard status.state == .idle else { return }
+        guard status.state == .idle else {
+            didAttemptAutostart = true
+            return
+        }
+        // A preset that is missing because the config is broken is worth another try once it is fixed
         let name = presetToStartAfterUpdate ?? config?.autorunPreset?.name
-        presetToStartAfterUpdate = nil
         guard let name, let preset = config?.preset(named: name) else { return }
+        presetToStartAfterUpdate = nil
+        didAttemptAutostart = true
         start(preset)
     }
 
@@ -275,6 +314,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         loadConfig()
         applyAppSettings()
         settings?.model.reload()
+        if let status = state.status { autostartIfNeeded(status) }
         render()
     }
 

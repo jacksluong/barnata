@@ -13,28 +13,15 @@ final class IconCatalogTests: XCTestCase {
 
     func testTheWarningSymbolIsTheOneTheMenuBarAlreadyUses() {
         XCTAssertEqual(IconCatalog.warningSymbol, "exclamationmark.triangle.fill")
-        XCTAssertTrue(IconCatalog.contains(IconCatalog.warningSymbol))
+        XCTAssertTrue(IconCatalog.isCurated(IconCatalog.warningSymbol))
     }
 
-    func testOnlyCatalogSymbolsAreAllowed() {
-        XCTAssertTrue(IconCatalog.contains("command"))
-        XCTAssertFalse(IconCatalog.contains("baseTemplate.png"))
-        XCTAssertFalse(IconCatalog.contains(""))
-        XCTAssertFalse(IconCatalog.contains("Command"))
-    }
-
-    func testAPresetReportsEveryLayerWhoseIconIsNotInThePool() {
-        let preset = Preset(
-            name: "P",
-            configPaths: ["/tmp/a.kbd"],
-            layerIcons: ["base": "command", "typing": "typingTemplate.png", "*": "not.a.symbol"]
-        )
-        XCTAssertEqual(preset.invalidLayerIcons, ["*", "typing"])
-    }
-
-    func testAPresetWithOnlyCatalogIconsReportsNothing() {
-        let preset = Preset(name: "P", configPaths: ["/tmp/a.kbd"], layerIcons: ["base": "command", "*": "circle"])
-        XCTAssertEqual(preset.invalidLayerIcons, [])
+    func testTheCatalogKnowsWhatItOffers() {
+        XCTAssertTrue(IconCatalog.isCurated("command"))
+        XCTAssertTrue(IconCatalog.isCurated("house.fill"))
+        XCTAssertFalse(IconCatalog.isCurated("baseTemplate.png"))
+        XCTAssertFalse(IconCatalog.isCurated(""))
+        XCTAssertFalse(IconCatalog.isCurated("Command"))
     }
 
     func testTheFallbackStillAnswersForUnknownLayers() {

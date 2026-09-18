@@ -58,9 +58,7 @@ public struct ConfigEntry: Identifiable, Equatable {
 
     public var id: String { name }
 
-    public var invalidIconLayers: [String] {
-        layerIcons.filter { !IconCatalog.contains($0.value) }.keys.sorted()
-    }
+    public var invalidIconLayers: [String] { LayerSymbol.unavailable(in: layerIcons) }
 
     public var hasInvalidIcons: Bool { !invalidIconLayers.isEmpty }
 }

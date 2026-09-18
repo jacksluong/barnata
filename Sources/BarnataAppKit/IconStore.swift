@@ -3,14 +3,14 @@ import BarnataCore
 import Foundation
 
 /// Menu bar images. Status icons are SF Symbols that `app.status_icons` can override with files.
-/// Layer icons are SF Symbols from `IconCatalog`; a value outside the pool draws the warning symbol.
+/// Layer icons are any SF Symbol this Mac can draw; a name it cannot draw shows the warning symbol.
 @MainActor
 public final class IconStore {
     /// Every image is fitted into this square so the status item never changes width
     public static let imageSize: CGFloat = 18
 
     private static let symbolNames: [IconResolver.StatusIcon: String] = [
-        .normal: "keyboard.badge.ellipsis",
+        .normal: "keyboard",
         .crashed: "exclamationmark.triangle.fill",
         .paused: "sleep",
         .reloading: "arrow.triangle.2.circlepath",
@@ -32,8 +32,7 @@ public final class IconStore {
             return statusImage(icon)
         case .layer(let layer):
             guard let symbol = preset?.iconSymbol(forLayer: layer) else { return statusImage(.normal) }
-            guard IconCatalog.contains(symbol) else { return symbolImage(IconCatalog.warningSymbol) }
-            return symbolImage(symbol) ?? statusImage(.normal)
+            return symbolImage(symbol) ?? symbolImage(IconCatalog.warningSymbol)
         }
     }
 

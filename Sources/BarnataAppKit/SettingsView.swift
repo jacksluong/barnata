@@ -16,7 +16,12 @@ public struct SettingsView: View {
             case .configs: ConfigsTab(model: model)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(
+            minWidth: SettingsWindowController.minimumContentSize.width,
+            maxWidth: .infinity,
+            minHeight: SettingsWindowController.minimumContentSize.height,
+            maxHeight: .infinity
+        )
         .alert(
             "Something went wrong",
             isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })
@@ -310,7 +315,7 @@ private struct LayerIconRow: View {
 
     @State private var isPickerOpen = false
 
-    private var isInvalid: Bool { symbol.map { !IconCatalog.contains($0) } ?? false }
+    private var isInvalid: Bool { symbol.map { !LayerSymbol.isAvailable($0) } ?? false }
 
     var body: some View {
         LabeledContent(title) {
@@ -323,7 +328,7 @@ private struct LayerIconRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.bordered)
-            .help(isInvalid ? "\(symbol ?? "") is not one of the icons Barnata offers" : "Choose an icon")
+            .help(isInvalid ? "\(symbol ?? "") is not a symbol this Mac can draw" : "Choose an icon")
             .popover(isPresented: $isPickerOpen, arrowEdge: .bottom) {
                 IconPicker(selected: symbol) { choice in
                     isPickerOpen = false
@@ -351,47 +356,73 @@ private struct IconPicker: View {
 
     @State private var query = ""
 
+    private var trimmedQuery: String { query.trimmingCharacters(in: .whitespaces) }
+
+    /// Any symbol this Mac can draw is a valid icon, so a typed name gets its own row
+    private var typedSymbol: String? {
+        guard !trimmedQuery.isEmpty, !IconCatalog.isCurated(trimmedQuery),
+              LayerSymbol.isAvailable(trimmedQuery)
+        else { return nil }
+        return trimmedQuery
+    }
+
     private var groups: [IconCatalog.Group] {
-        let trimmed = query.trimmingCharacters(in: .whitespaces).lowercased()
+        let needle = trimmedQuery.lowercased()
         return IconCatalog.groups.compactMap { group in
-            let symbols = group.symbols.filter { symbol in
-                (trimmed.isEmpty || symbol.contains(trimmed))
-                    && NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil
+            let symbols = group.symbols.filter {
+                (needle.isEmpty || $0.contains(needle)) && LayerSymbol.isAvailable($0)
             }
             return symbols.isEmpty ? nil : IconCatalog.Group(name: group.name, symbols: symbols)
         }
     }
+
+    private var isEmpty: Bool { groups.isEmpty && typedSymbol == nil }
 
     var body: some View {
         VStack(spacing: 8) {
             HStack {
                 TextField("Search", text: $query)
                     .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.leading)
                 Button("None") { onSelect(nil) }
             }
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 10) {
+                    if let typedSymbol {
+                        section(named: "Typed name", symbols: [typedSymbol])
+                    }
                     ForEach(groups) { group in
-                        Section {
-                            LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 4), count: 9), spacing: 4) {
-                                ForEach(group.symbols, id: \.self) { symbol in
-                                    IconCell(symbol: symbol, isSelected: symbol == selected) { onSelect(symbol) }
-                                }
-                            }
-                        } header: {
-                            Text(group.name)
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 2)
-                        }
+                        section(named: group.name, symbols: group.symbols)
                     }
                 }
+            }
+
+            if isEmpty {
+                Text(trimmedQuery.isEmpty ? "No icons" : "No SF Symbol named \u{201C}\(trimmedQuery)\u{201D}")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(10)
         .frame(width: 330, height: 360)
+    }
+
+    private func section(named name: String, symbols: [String]) -> some View {
+        Section {
+            LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 4), count: 9), spacing: 4) {
+                ForEach(symbols, id: \.self) { symbol in
+                    IconCell(symbol: symbol, isSelected: symbol == selected) { onSelect(symbol) }
+                }
+            }
+        } header: {
+            Text(name)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 2)
+        }
     }
 }
 

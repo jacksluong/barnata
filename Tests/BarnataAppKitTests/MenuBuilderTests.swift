@@ -185,9 +185,9 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(MenuBuilder.entries(for: state).item(titled: "No presets in config.toml")?.isEnabled, false)
     }
 
-    func testReloadKeepsItsShortcutAndQuitHasNone() {
+    func testReloadAndQuitCarryNoShortcut() {
         let entries = MenuBuilder.entries(for: runningState())
-        XCTAssertEqual(entries.item(titled: "Reload config")?.keyEquivalent, "r")
+        XCTAssertEqual(entries.item(titled: "Reload config")?.keyEquivalent, "")
         XCTAssertEqual(entries.item(titled: "Quit Barnata")?.keyEquivalent, "")
         XCTAssertEqual(entries.item(titled: "Quit Barnata")?.action, .quit)
     }
