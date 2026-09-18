@@ -33,9 +33,25 @@ In **General**, all three permission rows need a green check before kanata can s
 
 **Configs** holds your kanata config files. Press `+` to add one. Each entry is a preset: a name, one `.kbd` file, and an icon per layer. To pull in configuration from more than one `.kbd` file, use kanata's [`include` keyword](https://github.com/jtroo/kanata/blob/main/docs/config.adoc#include-other-files).
 
-Layer icons are [SF Symbols](https://developer.apple.com/sf-symbols/). The picker shows a curated set, but you may search for any symbol name
+Layer icons are [SF Symbols](https://developer.apple.com/sf-symbols/). The picker shows a curated set, but you may search for any symbol name.
+
+<p align="center">
+  <img
+    alt="Barnata settings window, Configs tab"
+    width="832"
+    src=".github/assets/settings.png"
+  />
+</p>
 
 Presets appear in the menu bar. Click a preset to start it, click it again to stop.
+
+<p align="center">
+  <img
+    alt="Barnata menu bar icon and menu"
+    width="343"
+    src=".github/assets/menu-bar.png"
+  />
+</p>
 
 ### Config file
 
@@ -45,15 +61,15 @@ Settings are stored in `~/.config/barnata/config.toml`, which you can also edit 
 [app]
 show_dock_icon = false
 launch_at_login = true
-status_icons = "my-icons"        # directory under ~/.config/barnata/icons
+status_icons = "my-icons"     # directory under ~/.config/barnata/icons
 
-[defaults]                        # inherited by presets that omit these keys
+[defaults]                    # inherited by presets that omit these keys
 autorestart_on_crash = false
-extra_args = ["--debug"]           # only kanata's logging and startup flags are accepted
+extra_args = ["--debug"]      # only kanata's logging and startup flags are accepted
 
 [presets.Colemak]
 kanata_config = "~/.config/kanata/colemak.kbd"
-autorun = true                    # at most one preset may set this
+autorun = true                # at most one preset may set this
 
 [presets.Colemak.layer_icons]
 "*" = "keyboard"

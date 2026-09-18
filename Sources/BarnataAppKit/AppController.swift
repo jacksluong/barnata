@@ -9,6 +9,10 @@ public final class AppController: NSObject, NSApplicationDelegate {
     public static let reloadFlashDuration: TimeInterval = 2
     /// How long quitting waits for the daemon to confirm before leaving anyway
     public static let quitTimeout: TimeInterval = 5
+    /// Failed connections to an approved daemon before its launchd job is rebuilt
+    public static let repairAfterFailures = 3
+    /// Rebuilds attempted per launch, so a registration that cannot be fixed stops churning
+    public static let maxRegistrationRepairs = 3
 
     private let setup = SetupActions()
     private let statusItem = StatusItemController()
@@ -16,6 +20,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private let tcpClient = KanataTCPClient()
     private let configURL: URL
     private let watcher: ConfigWatcher
+    private let launchState = LaunchState()
 
     private var state = MenuState()
     private var config: Config?
@@ -33,6 +38,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private var signalSources: [DispatchSourceSignal] = []
     private var didCheckKanataVersion = false
     private var presetToStartAfterUpdate: String?
+    private var isDaemonConnected = false
+    private var registrationRepairs = 0
 
     public override init() {
         configURL = ConfigLoader.defaultURL()
@@ -47,6 +54,9 @@ public final class AppController: NSObject, NSApplicationDelegate {
         state.currentUID = getuid()
         state.configPath = configURL.path
         NSApp.mainMenu = MainMenu.make()
+
+        presetToStartAfterUpdate = launchState.presetToResume(currentVersion: state.appVersion)
+        launchState.recordLaunch(version: state.appVersion)
 
         loadConfig()
         applyAppSettings()
@@ -129,17 +139,22 @@ public final class AppController: NSObject, NSApplicationDelegate {
         case .status(let status):
             apply(status)
         case .disconnected:
+            isDaemonConnected = false
             state.status = nil
             // A daemon that died before it could start the preset should be retried on reconnect
             didAttemptAutostart = false
             tcpClient.disconnect()
             clearLayers()
             render()
+        case .unreachable(let attempts):
+            repairDaemonRegistration(after: attempts)
         }
     }
 
     /// Update flow: a daemon from an older bundle is shut down so launchd starts the new binary
     private func handleDaemonConnected(daemonVersion: String) {
+        isDaemonConnected = true
+        registrationRepairs = 0
         if isRestartingDaemonForUpdate {
             // launchd started the new binary; it has no children, so autorun applies again
             isRestartingDaemonForUpdate = false
@@ -158,7 +173,9 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
         daemonClient.status(onMain { [weak self] status in
             guard let self else { return }
-            presetToStartAfterUpdate = status?.state == .running ? status?.presetName : nil
+            // Keeps the preset the last launch recorded when this daemon has nothing running
+            presetToStartAfterUpdate = (status?.state == .running ? status?.presetName : nil)
+                ?? presetToStartAfterUpdate
             daemonClient.stopKanata(onMain { [weak self] _ in
                 guard let self else { return }
                 daemonClient.shutdownDaemon(onMain { [weak self] _ in
@@ -175,8 +192,30 @@ public final class AppController: NSObject, NSApplicationDelegate {
         })
     }
 
+    /// A Homebrew upgrade used to run `launchctl remove` on the daemon, which drops the launchd
+    /// job while `SMAppService` still reports it enabled, so nothing short of re-registering
+    /// brings the Mach service back.
+    private func repairDaemonRegistration(after attempts: Int) {
+        guard registrationRepairs < AppController.maxRegistrationRepairs, !isShuttingDownForQuit else { return }
+        guard attempts >= AppController.repairAfterFailures, setup.isDaemonApproved else { return }
+        registrationRepairs += 1
+        log.notice("the daemon is approved but unreachable after \(attempts) attempts, re-registering it")
+
+        setup.repairDaemonRegistration { [weak self] error in
+            guard let self else { return }
+            state.lastActionError = error
+            refreshSetupState()
+            daemonClient.reconnect()
+            render()
+        }
+    }
+
     private func apply(_ status: DaemonStatus) {
         state.status = status
+        // The idle status a quit or an update restart pushes is not the user's choice to stop
+        if !isShuttingDownForQuit, !isRestartingDaemonForUpdate {
+            launchState.recordRunningPreset(status.state == .running ? status.presetName : nil)
+        }
 
         if status.state == .running, !state.isRunningForAnotherUser, let port = status.tcpPort {
             tcpClient.connect(port: port)
@@ -359,6 +398,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
     private func refreshOnMenuOpen() {
         refreshSetupState()
+        // The backoff climbs to 30 s, and an open menu is the moment the user wants it retried
+        if !isDaemonConnected { daemonClient.reconnect() }
         refreshStatus()
         render()
     }

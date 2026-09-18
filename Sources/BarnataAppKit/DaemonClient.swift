@@ -7,6 +7,8 @@ public final class DaemonClient: NSObject, @unchecked Sendable {
         case connected(daemonVersion: String)
         case status(DaemonStatus)
         case disconnected
+        /// The Mach service never answered; `attempts` counts consecutive failures since the last handshake
+        case unreachable(attempts: Int)
     }
 
     public static let backoffDelays: [TimeInterval] = [1, 2, 4, 8, 16, 30]
@@ -17,6 +19,8 @@ public final class DaemonClient: NSObject, @unchecked Sendable {
     private var subscription: NSXPCListener?
     private var subscriptionDelegate: SubscriptionDelegate?
     private var attempt = 0
+    private var failures = 0
+    private var didHandshake = false
     private var isStopped = true
 
     /// Delivered on the main queue
@@ -49,6 +53,7 @@ public final class DaemonClient: NSObject, @unchecked Sendable {
             guard !self.isStopped else { return }
             self.teardown()
             self.attempt = 0
+            self.failures = 0
             self.scheduleReconnect()
         }
     }
@@ -102,6 +107,7 @@ public final class DaemonClient: NSObject, @unchecked Sendable {
     private func openConnection() {
         guard !isStopped, connection == nil else { return }
 
+        didHandshake = false
         let connection = NSXPCConnection(machServiceName: machServiceName, options: .privileged)
         connection.remoteObjectInterface = NSXPCInterface(with: BarnataDaemonProtocol.self)
         connection.invalidationHandler = { [weak self] in self?.handleDrop(reason: "invalidated") }
@@ -121,6 +127,8 @@ public final class DaemonClient: NSObject, @unchecked Sendable {
             queue.async {
                 guard let live = self.connection, ObjectIdentifier(live) == token else { return }
                 self.attempt = 0
+                self.failures = 0
+                self.didHandshake = true
                 self.installSubscription(on: live)
                 self.emit(.connected(daemonVersion: version))
             }
@@ -147,8 +155,13 @@ public final class DaemonClient: NSObject, @unchecked Sendable {
         queue.async {
             guard !self.isStopped, self.connection != nil else { return }
             log.notice("daemon connection \(reason, privacy: .public)")
+            let neverAnswered = !self.didHandshake
             self.teardown()
             self.emit(.disconnected)
+            if neverAnswered {
+                self.failures += 1
+                self.emit(.unreachable(attempts: self.failures))
+            }
             self.scheduleReconnect()
         }
     }

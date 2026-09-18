@@ -35,6 +35,26 @@ public struct SetupActions {
         }
     }
 
+    /// launchd can lose the job while `SMAppService` still calls it enabled, which is what
+    /// `launchctl remove` leaves behind. Only a fresh registration rebuilds the Mach service.
+    public func repairDaemonRegistration(completion: @escaping @MainActor (String?) -> Void) {
+        daemon.unregister { _ in
+            // A job launchd already dropped reports an error here, which is the case being repaired
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    do {
+                        try self.daemon.register()
+                        log.notice("re-registered the daemon, status is now \(String(describing: self.daemon.status), privacy: .public)")
+                        completion(nil)
+                    } catch {
+                        log.error("cannot re-register the daemon: \(error.localizedDescription, privacy: .public)")
+                        completion(error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
     /// Unregistering also stops whatever the daemon is running, so uninstall needs nothing else
     public func unregisterDaemon() {
         do {
