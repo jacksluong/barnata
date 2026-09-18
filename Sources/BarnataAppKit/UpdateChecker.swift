@@ -30,6 +30,7 @@ public final class UpdateChecker {
     private let session: URLSession
     private var timer: Timer?
     private var isChecking = false
+    private var waiting: [(AvailableUpdate?) -> Void] = []
 
     public init(currentVersion: String, session: URLSession = .shared) {
         self.currentVersion = currentVersion
@@ -44,13 +45,9 @@ public final class UpdateChecker {
         check()
     }
 
-    public func stop() {
-        timer?.invalidate()
-        timer = nil
-        apply(nil)
-    }
-
-    public func check() {
+    /// `completion` runs once this check finishes, including when it finds nothing
+    public func check(completion: ((AvailableUpdate?) -> Void)? = nil) {
+        if let completion { waiting.append(completion) }
         guard !isChecking else { return }
         isChecking = true
 
@@ -69,11 +66,17 @@ public final class UpdateChecker {
                     guard let self else { return }
                     self.isChecking = false
                     // A check that never reached the API keeps whatever the last good one found
-                    guard data != nil else { return }
-                    self.apply(found)
+                    if data != nil { self.apply(found) }
+                    self.finishWaiting()
                 }
             }
         }.resume()
+    }
+
+    private func finishWaiting() {
+        let completions = waiting
+        waiting = []
+        for completion in completions { completion(available) }
     }
 
     private func apply(_ update: AvailableUpdate?) {

@@ -63,7 +63,6 @@ Settings are stored in `~/.config/barnata/config.toml`, which you can also edit 
 [app]
 show_dock_icon = false
 launch_at_login = true
-check_for_updates = true      # daily check against the GitHub releases page
 status_icons = "my-icons"     # directory under ~/.config/barnata/icons
 
 [defaults]                    # inherited by presets that omit these keys

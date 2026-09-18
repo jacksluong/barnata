@@ -9,12 +9,16 @@ final class SettingsModelTests: XCTestCase {
     private var root: URL!
     private var configURL: URL!
     private var stopCount = 0
+    private var showUpdateCount = 0
+    private var updateToFind: AvailableUpdate?
 
     override func setUp() async throws {
         root = URL(fileURLWithPath: NSTemporaryDirectory()).appending(path: UUID().uuidString)
         configURL = root.appending(path: "barnata/config.toml")
         try FileManager.default.createDirectory(at: root.appending(path: "barnata"), withIntermediateDirectories: true)
         stopCount = 0
+        showUpdateCount = 0
+        updateToFind = nil
     }
 
     override func tearDown() async throws {
@@ -34,7 +38,8 @@ final class SettingsModelTests: XCTestCase {
                     completion(.success)
                 },
                 setDockIconVisible: { _ in },
-                showUpdate: {},
+                showUpdate: { [weak self] in self?.showUpdateCount += 1 },
+                checkForUpdates: { [weak self] completion in completion(self?.updateToFind) },
                 configDidChange: { _ in }
             )
         )
@@ -214,6 +219,45 @@ final class SettingsModelTests: XCTestCase {
 
         XCTAssertEqual(model.entries.map(\.name), ["Padded"])
         XCTAssertEqual(model.selection, "Padded")
+    }
+
+    // MARK: - Updates
+
+    func testTheButtonChecksWhileNoUpdateIsKnown() throws {
+        let model = try makeModel()
+        XCTAssertEqual(model.updateButtonTitle, "Check for updates")
+        XCTAssertNil(model.updateNotice)
+
+        model.updateButtonTapped()
+        XCTAssertEqual(model.updateButtonTitle, "Check for updates")
+        XCTAssertEqual(model.updateNotice, "Up to date")
+        XCTAssertEqual(showUpdateCount, 0)
+    }
+
+    func testAFoundUpdateRenamesTheButtonAndAnnouncesItself() throws {
+        let model = try makeModel()
+        updateToFind = AvailableUpdate(version: "9.9.9")
+        model.updateButtonTapped()
+
+        XCTAssertEqual(model.updateButtonTitle, "Update")
+        XCTAssertEqual(model.updateNotice, "Update available!")
+    }
+
+    func testTheButtonInstallsOnceAnUpdateIsKnown() throws {
+        let model = try makeModel()
+        model.availableUpdate = AvailableUpdate(version: "9.9.9")
+        model.updateButtonTapped()
+
+        XCTAssertEqual(showUpdateCount, 1)
+    }
+
+    func testAnUpdateInProgressDisablesTheButton() throws {
+        let model = try makeModel()
+        model.availableUpdate = AvailableUpdate(version: "9.9.9")
+        model.isUpdating = true
+
+        XCTAssertEqual(model.updateButtonTitle, "Updating\u{2026}")
+        XCTAssertFalse(model.isUpdateButtonEnabled)
     }
 }
 

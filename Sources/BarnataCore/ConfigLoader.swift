@@ -90,12 +90,11 @@ public enum ConfigLoader {
     private static func parseApp(_ reader: TableReader?) throws -> AppSettings {
         guard let reader else { return AppSettings() }
         try reader.rejectUnknownKeys([
-            "launch_at_login", "show_dock_icon", "check_for_updates", "status_icons",
+            "launch_at_login", "show_dock_icon", "status_icons",
         ])
         return AppSettings(
             launchAtLogin: try reader.bool(named: "launch_at_login"),
             showDockIcon: try reader.bool(named: "show_dock_icon") ?? false,
-            checkForUpdates: try reader.bool(named: "check_for_updates") ?? true,
             statusIcons: try reader.string(named: "status_icons")
         )
     }

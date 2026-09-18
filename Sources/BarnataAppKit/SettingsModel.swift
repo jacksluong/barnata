@@ -12,6 +12,8 @@ public struct SettingsActions {
     public var stopKanata: (@escaping (CommandResult) -> Void) -> Void
     public var setDockIconVisible: (Bool) -> Void
     public var showUpdate: () -> Void
+    /// Runs one update check now, answering with whatever it found
+    public var checkForUpdates: (@escaping (AvailableUpdate?) -> Void) -> Void
     /// Called after the window writes config.toml, with the modification date the watcher should ignore
     public var configDidChange: (Date?) -> Void
 
@@ -21,6 +23,7 @@ public struct SettingsActions {
         stopKanata: @escaping (@escaping (CommandResult) -> Void) -> Void,
         setDockIconVisible: @escaping (Bool) -> Void,
         showUpdate: @escaping () -> Void,
+        checkForUpdates: @escaping (@escaping (AvailableUpdate?) -> Void) -> Void,
         configDidChange: @escaping (Date?) -> Void
     ) {
         self.installDriver = installDriver
@@ -28,6 +31,7 @@ public struct SettingsActions {
         self.stopKanata = stopKanata
         self.setDockIconVisible = setDockIconVisible
         self.showUpdate = showUpdate
+        self.checkForUpdates = checkForUpdates
         self.configDidChange = configDidChange
     }
 }
@@ -70,6 +74,7 @@ public struct ConfigEntry: Identifiable, Equatable {
 @MainActor
 public final class SettingsModel: ObservableObject {
     public static let permissionPollInterval: TimeInterval = 2
+    public static let upToDateNoticeDuration: TimeInterval = 4
     public static let uninstallConfirmationWord = "UNINSTALL"
 
     @Published public var tab: SettingsTab = .general
@@ -81,9 +86,10 @@ public final class SettingsModel: ObservableObject {
 
     @Published public var launchAtLogin = false
     @Published public var showDockIcon = false
-    @Published public var checkForUpdates = true
     @Published public var availableUpdate: AvailableUpdate?
     @Published public var isUpdating = false
+    @Published public var isCheckingForUpdate = false
+    @Published public var isShowingUpToDate = false
     @Published public var daemonApproved = false
     @Published public var hasAccessibility = false
     @Published public var driver: DriverStatus?
@@ -96,6 +102,7 @@ public final class SettingsModel: ObservableObject {
     private let actions: SettingsActions
     private var config: Config?
     private var pollTimer: Timer?
+    private var upToDateTimer: Timer?
 
     public init(configURL: URL, setup: SetupActions, actions: SettingsActions) {
         self.configURL = configURL
@@ -158,7 +165,6 @@ public final class SettingsModel: ObservableObject {
         hasAccessibility = setup.hasAccessibility
         launchAtLogin = setup.isLaunchAtLoginEnabled
         showDockIcon = config?.app.showDockIcon ?? false
-        checkForUpdates = config?.app.checkForUpdates ?? true
     }
 
     public func startPolling() {
@@ -174,6 +180,7 @@ public final class SettingsModel: ObservableObject {
     public func stopPolling() {
         pollTimer?.invalidate()
         pollTimer = nil
+        hideUpToDateNotice()
     }
 
     // MARK: - Config files
@@ -289,13 +296,58 @@ public final class SettingsModel: ObservableObject {
         launchAtLogin = setup.isLaunchAtLoginEnabled
     }
 
-    public func setCheckForUpdates(_ value: Bool) {
-        apply { $0.set(.bool(value), forKey: ConfigWriter.Key.checkForUpdates.rawValue, inTable: [ConfigWriter.tableName]) }
-        checkForUpdates = value
-    }
-
     public func showUpdate() {
         actions.showUpdate()
+    }
+
+    // MARK: - Updates
+
+    public var updateNotice: String? {
+        if availableUpdate != nil { return "Update available!" }
+        return isShowingUpToDate ? "Up to date" : nil
+    }
+
+    public var updateButtonTitle: String {
+        if isUpdating { return "Updating\u{2026}" }
+        if availableUpdate != nil { return "Update" }
+        return isCheckingForUpdate ? "Checking\u{2026}" : "Check for updates"
+    }
+
+    public var isUpdateButtonEnabled: Bool { !isUpdating && !isCheckingForUpdate }
+
+    /// One button for both jobs: install a known update, or go look for one
+    public func updateButtonTapped() {
+        guard availableUpdate == nil else { return showUpdate() }
+        checkForUpdatesNow()
+    }
+
+    public func checkForUpdatesNow() {
+        guard !isCheckingForUpdate else { return }
+        isCheckingForUpdate = true
+        hideUpToDateNotice()
+        actions.checkForUpdates { [weak self] update in
+            guard let self else { return }
+            isCheckingForUpdate = false
+            availableUpdate = update
+            if update == nil { showUpToDateNotice() }
+        }
+    }
+
+    /// The only sign a check that found nothing ran at all, so it fades on its own
+    private func showUpToDateNotice() {
+        isShowingUpToDate = true
+        upToDateTimer = Timer.scheduledTimer(
+            withTimeInterval: SettingsModel.upToDateNoticeDuration,
+            repeats: false
+        ) { _ in
+            MainActor.assumeIsolated { self.hideUpToDateNotice() }
+        }
+    }
+
+    private func hideUpToDateNotice() {
+        upToDateTimer?.invalidate()
+        upToDateTimer = nil
+        isShowingUpToDate = false
     }
 
     public func setShowDockIcon(_ value: Bool) {

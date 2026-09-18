@@ -15,6 +15,7 @@ let model = SettingsModel(
         stopKanata: { $0(.success) },
         setDockIconVisible: { _ in },
         showUpdate: {},
+        checkForUpdates: { $0(nil) },
         configDidChange: { _ in }
     )
 )

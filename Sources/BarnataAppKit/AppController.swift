@@ -60,6 +60,8 @@ public final class AppController: NSObject, NSApplicationDelegate {
         launchState.recordLaunch(version: state.appVersion)
 
         updateChecker.onChange = { [weak self] update in self?.updateDidChange(update) }
+        // A bare executable is not a bundle Homebrew can upgrade, so it is never offered one
+        if AppBundle.bundleURL != nil { updateChecker.start() }
         loadConfig()
         applyAppSettings()
 
@@ -350,12 +352,6 @@ public final class AppController: NSObject, NSApplicationDelegate {
         guard let config else { return }
         state.showDockIcon = config.app.showDockIcon
         statusItem.setDockIconVisible(config.app.showDockIcon)
-        // A bare executable is not a bundle Homebrew can upgrade, so it is never offered one
-        if config.app.checkForUpdates, AppBundle.bundleURL != nil {
-            updateChecker.start()
-        } else {
-            updateChecker.stop()
-        }
         if let wanted = config.app.launchAtLogin, wanted != setup.isLaunchAtLoginEnabled {
             setup.setLaunchAtLogin(wanted)
         }
@@ -535,6 +531,10 @@ public final class AppController: NSObject, NSApplicationDelegate {
                     self?.statusItem.setDockIconVisible(visible)
                 },
                 showUpdate: { [weak self] in self?.offerUpdate() },
+                checkForUpdates: { [weak self] completion in
+                    guard let self, AppBundle.bundleURL != nil else { return completion(nil) }
+                    updateChecker.check(completion: completion)
+                },
                 configDidChange: { [weak self] modified in
                     guard let self else { return }
                     watcher.ignoreChange(modifiedAt: modified)

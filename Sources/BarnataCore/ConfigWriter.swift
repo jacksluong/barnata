@@ -6,7 +6,6 @@ public enum ConfigWriter {
     public enum Key: String, Sendable, CaseIterable {
         case launchAtLogin = "launch_at_login"
         case showDockIcon = "show_dock_icon"
-        case checkForUpdates = "check_for_updates"
     }
 
     public static let tableName = "app"
