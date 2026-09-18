@@ -12,10 +12,12 @@ public enum StrayProcesses {
         guard written > 0 else { return [] }
 
         // PROC_PIDPATHINFO_MAXSIZE is not exposed to Swift; it is four times MAXPATHLEN
-        var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+        var buffer = [UInt8](repeating: 0, count: 4 * Int(MAXPATHLEN))
         return pids.prefix(Int(written) / MemoryLayout<pid_t>.size).filter { pid in
-            guard pid > 0, proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return false }
-            return String(cString: buffer) == path
+            guard pid > 0 else { return false }
+            let length = proc_pidpath(pid, &buffer, UInt32(buffer.count))
+            guard length > 0 else { return false }
+            return String(decoding: buffer[..<Int(length)], as: UTF8.self) == path
         }
     }
 }
