@@ -68,6 +68,12 @@ public final class AppController: NSObject, NSApplicationDelegate {
         render()
     }
 
+    /// The app has no main window, so a Dock click opens or raises the settings window
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows: Bool) -> Bool {
+        showSettings()
+        return true
+    }
+
     /// Quitting takes kanata and the daemon with it, and waits for them to be gone, so the
     /// keyboard is never left remapped by an absent app
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

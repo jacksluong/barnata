@@ -65,6 +65,10 @@ kanata_config = "~/.config/kanata/fps.kbd"
 
 Status icons replace the menu bar image for each state. Name the files `default`, `crashed`, `paused`, or `reloading`. A `Template` suffix, as in `defaultTemplate.png`, makes macOS tint the image to match the menu bar.
 
+## Uninstall
+
+The best way to uninstall is through the Uninstall button in the Preferences window. Uninstalling through Homebrew will result in an orphaned "not found" entry in Login Items.
+
 ## License
 
 Barnata is licensed under the GNU General Public License version 3, in `LICENSE`.
