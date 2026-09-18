@@ -24,7 +24,6 @@ BUNDLE_VERSION="$(git -C "$REPO_ROOT" rev-list --count HEAD 2>/dev/null || echo 
 echo "==> Fetching bundled binaries"
 [[ -f "${BUILD_DIR}/kanata" ]] || "${REPO_ROOT}/Scripts/fetch-kanata.sh"
 [[ -f "${BUILD_DIR}/driver.pkg" ]] || "${REPO_ROOT}/Scripts/fetch-driver.sh"
-[[ -f "${REPO_ROOT}/Resources/AppIcon.icns" ]] || "${REPO_ROOT}/Scripts/make-icon.sh"
 
 echo "==> Building ${CONFIGURATION} (arm64)"
 (cd "$REPO_ROOT" && swift build -c "$CONFIGURATION" --arch arm64)
