@@ -32,7 +32,7 @@ echo "==> Running tests"
 swift test
 
 echo "==> Tagging ${TAG}"
-git tag -a "$TAG" -m "Barnata ${VERSION}"
+git tag -a "$TAG" -m "$TAG"
 
 # build-app.sh reads the version back out of `git describe`, so the tag has to exist first.
 # Any failure past this point leaves a local tag behind that nothing has pushed.
@@ -60,7 +60,7 @@ git push origin "$TAG"
 echo "==> Creating the GitHub release"
 gh release create "$TAG" "$RELEASE_ZIP" \
   --repo "$GITHUB_REPO" \
-  --title "Barnata ${VERSION}" \
+  --title "$TAG" \
   --notes "Install with \`brew install --cask ${CASK_TOKEN}\`."
 
 CASK="${TAP_DIR}/Casks/${CASK_NAME}.rb"
