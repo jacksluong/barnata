@@ -49,7 +49,8 @@ public struct PosixFileInspector: FileInspecting {
 /// A request the daemon has accepted, with the exact argv it will pass to kanata
 public struct ValidatedStartRequest: Sendable, Equatable {
     public var presetName: String
-    public var configPaths: [String]
+    /// nil for a child that takes no config file, such as the virtual HID daemon
+    public var configPath: String?
     public var extraArgs: [String]
     public var autorestartOnCrash: Bool
     public var ownerUID: uid_t
@@ -71,26 +72,24 @@ public struct RequestValidator: Sendable {
     }
 
     public func validate(_ request: StartRequest, ownerUID: uid_t) throws -> ValidatedStartRequest {
-        guard !request.configPaths.isEmpty else {
-            throw ValidationError(rule: "config path", detail: "a start request needs at least one config file")
+        let path = request.configPath
+        guard !path.isEmpty else {
+            throw ValidationError(rule: "config path", detail: "a start request needs a config file")
         }
-
-        for path in request.configPaths {
-            guard path.hasPrefix("/") else {
-                throw ValidationError(rule: "config path must be absolute", detail: "\(path) is relative")
-            }
-            guard let facts = inspector.facts(forPath: path) else {
-                throw ValidationError(rule: "config path must exist", detail: "\(path) does not exist")
-            }
-            guard facts.isRegularFile else {
-                throw ValidationError(rule: "config path must be a regular file", detail: "\(path) is not a regular file")
-            }
-            guard facts.ownerUID == ownerUID || facts.isWorldReadable else {
-                throw ValidationError(
-                    rule: "config file must be owned by the caller or world-readable",
-                    detail: "\(path) is owned by uid \(facts.ownerUID), not uid \(ownerUID), and is not world-readable"
-                )
-            }
+        guard path.hasPrefix("/") else {
+            throw ValidationError(rule: "config path must be absolute", detail: "\(path) is relative")
+        }
+        guard let facts = inspector.facts(forPath: path) else {
+            throw ValidationError(rule: "config path must exist", detail: "\(path) does not exist")
+        }
+        guard facts.isRegularFile else {
+            throw ValidationError(rule: "config path must be a regular file", detail: "\(path) is not a regular file")
+        }
+        guard facts.ownerUID == ownerUID || facts.isWorldReadable else {
+            throw ValidationError(
+                rule: "config file must be owned by the caller or world-readable",
+                detail: "\(path) is owned by uid \(facts.ownerUID), not uid \(ownerUID), and is not world-readable"
+            )
         }
 
         do {
@@ -101,7 +100,7 @@ public struct RequestValidator: Sendable {
 
         return ValidatedStartRequest(
             presetName: request.presetName,
-            configPaths: request.configPaths,
+            configPath: path,
             extraArgs: request.extraArgs,
             autorestartOnCrash: request.autorestartOnCrash,
             ownerUID: ownerUID,
@@ -110,13 +109,6 @@ public struct RequestValidator: Sendable {
     }
 
     static func arguments(for request: StartRequest) -> [String] {
-        var arguments: [String] = []
-        for path in request.configPaths {
-            arguments.append("-c")
-            arguments.append(path)
-        }
-        arguments.append("--no-wait")
-        arguments.append(contentsOf: request.extraArgs)
-        return arguments
+        ["-c", request.configPath, "--no-wait"] + request.extraArgs
     }
 }

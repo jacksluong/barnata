@@ -126,14 +126,17 @@ public enum ConfigLoader {
                 "kanata_config", "autorun", "autorestart_on_crash", "extra_args", "layer_icons",
             ])
 
-            let rawPaths = try preset.stringOrStringArray(named: "kanata_config")
-            guard let rawPaths, !rawPaths.isEmpty else {
-                throw ConfigError(keyPath: "\(preset.prefix)kanata_config", reason: "required, a path or an array of paths")
+            let rawPath = try preset.configPath(named: "kanata_config")
+            guard let rawPath, !rawPath.isEmpty else {
+                throw ConfigError(
+                    keyPath: "\(preset.prefix)kanata_config",
+                    reason: "required, the path to one .kbd file"
+                )
             }
 
             return Preset(
                 name: name,
-                configPaths: rawPaths.map { ConfigPath.expand($0, home: home, relativeTo: directory) },
+                configPath: ConfigPath.expand(rawPath, home: home, relativeTo: directory),
                 autorun: try preset.bool(named: "autorun") ?? false,
                 autorestartOnCrash: try preset.bool(named: "autorestart_on_crash") ?? defaults.autorestartOnCrash,
                 extraArgs: try preset.extraArgs(named: "extra_args") ?? defaults.extraArgs,
@@ -187,6 +190,19 @@ private struct TableReader {
 
     func string(named key: String) throws -> String? {
         guard let value = table[key] else { return nil }
+        guard let result = value.string else { throw ConfigError(keyPath: path(key), reason: "expected a string") }
+        return result
+    }
+
+    /// `kanata_config` used to accept an array, so an array gets its own message
+    func configPath(named key: String) throws -> String? {
+        guard let value = table[key] else { return nil }
+        guard value.array == nil else {
+            throw ConfigError(
+                keyPath: path(key),
+                reason: "expected one path, not a list; combine files with kanata's include keyword"
+            )
+        }
         guard let result = value.string else { throw ConfigError(keyPath: path(key), reason: "expected a string") }
         return result
     }

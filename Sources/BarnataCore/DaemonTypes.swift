@@ -10,18 +10,18 @@ public enum KanataState: String, Codable, Sendable {
 
 public struct StartRequest: Codable, Sendable, Equatable {
     public var presetName: String
-    public var configPaths: [String]
+    public var configPath: String
     public var extraArgs: [String]
     public var autorestartOnCrash: Bool
 
     public init(
         presetName: String,
-        configPaths: [String],
+        configPath: String,
         extraArgs: [String] = [],
         autorestartOnCrash: Bool = false
     ) {
         self.presetName = presetName
-        self.configPaths = configPaths
+        self.configPath = configPath
         self.extraArgs = extraArgs
         self.autorestartOnCrash = autorestartOnCrash
     }
@@ -58,7 +58,7 @@ public struct DaemonStatus: Codable, Sendable, Equatable {
     public var state: KanataState
     public var pid: Int32?
     public var presetName: String?
-    public var configPaths: [String]
+    public var configPath: String?
     public var tcpPort: Int?
     public var ownerUID: uid_t?
     public var lastExitCode: Int32?
@@ -72,7 +72,7 @@ public struct DaemonStatus: Codable, Sendable, Equatable {
         state: KanataState = .idle,
         pid: Int32? = nil,
         presetName: String? = nil,
-        configPaths: [String] = [],
+        configPath: String? = nil,
         tcpPort: Int? = nil,
         ownerUID: uid_t? = nil,
         lastExitCode: Int32? = nil,
@@ -85,7 +85,7 @@ public struct DaemonStatus: Codable, Sendable, Equatable {
         self.state = state
         self.pid = pid
         self.presetName = presetName
-        self.configPaths = configPaths
+        self.configPath = configPath
         self.tcpPort = tcpPort
         self.ownerUID = ownerUID
         self.lastExitCode = lastExitCode

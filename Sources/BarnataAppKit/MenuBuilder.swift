@@ -53,12 +53,6 @@ public enum MenuBuilder {
 
         let liveControls = state.canControlKanata && state.isRunning
         entries.append(.item(MenuItem(title: "Reload config", action: .reloadConfig, isEnabled: liveControls)))
-
-        if state.activePresetSupportsCycling {
-            entries.append(.item(MenuItem(title: "Next config file", action: .nextConfigFile, isEnabled: liveControls)))
-            entries.append(.item(MenuItem(title: "Previous config file", action: .previousConfigFile, isEnabled: liveControls)))
-        }
-
         entries.append(.item(MenuItem(title: "Restart kanata", action: .restartKanata, isEnabled: liveControls)))
         entries.append(.item(MenuItem(
             title: "Stop kanata",

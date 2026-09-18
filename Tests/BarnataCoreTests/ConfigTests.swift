@@ -14,7 +14,7 @@ final class ConfigParsingTests: XCTestCase {
 
         let preset = try XCTUnwrap(config.preset(named: "Default"))
         XCTAssertTrue(preset.autorun)
-        XCTAssertEqual(preset.configPaths, ["/Users/test/.config/kanata/example.kbd"])
+        XCTAssertEqual(preset.configPath, "/Users/test/.config/kanata/example.kbd")
         XCTAssertEqual(preset.layerIcons.count, 10)
         XCTAssertEqual(config.autorunPreset?.name, "Default")
     }
@@ -95,7 +95,7 @@ final class PathTests: XCTestCase {
         [presets."P"]
         kanata_config = "~/keys/example.kbd"
         """)
-        XCTAssertEqual(config.presets[0].configPaths, ["/Users/test/keys/example.kbd"])
+        XCTAssertEqual(config.presets[0].configPath, "/Users/test/keys/example.kbd")
     }
 
     func testRelativePathResolvesAgainstConfigDirectory() throws {
@@ -103,7 +103,7 @@ final class PathTests: XCTestCase {
         [presets."P"]
         kanata_config = "kbd/example.kbd"
         """)
-        XCTAssertEqual(config.presets[0].configPaths, ["/Users/test/.config/barnata/kbd/example.kbd"])
+        XCTAssertEqual(config.presets[0].configPath, "/Users/test/.config/barnata/kbd/example.kbd")
     }
 
     func testAbsolutePathIsStandardized() throws {
@@ -111,7 +111,7 @@ final class PathTests: XCTestCase {
         [presets."P"]
         kanata_config = "/etc/kanata/../kanata/example.kbd"
         """)
-        XCTAssertEqual(config.presets[0].configPaths, ["/etc/kanata/example.kbd"])
+        XCTAssertEqual(config.presets[0].configPath, "/etc/kanata/example.kbd")
     }
 
     func testBareTildeIsHome() {
@@ -124,23 +124,13 @@ final class PathTests: XCTestCase {
     }
 }
 
-final class KanataConfigShapeTests: XCTestCase {
-    func testSingleStringGivesOnePath() throws {
+final class KanataConfigPathTests: XCTestCase {
+    func testOnePathIsRead() throws {
         let preset = try parseConfig("""
         [presets."P"]
-        kanata_config = "/tmp/a.kbd"
+        kanata_config = "~/a.kbd"
         """).presets[0]
-        XCTAssertEqual(preset.configPaths, ["/tmp/a.kbd"])
-        XCTAssertFalse(preset.supportsConfigCycling)
-    }
-
-    func testArrayGivesEveryPathInOrder() throws {
-        let preset = try parseConfig("""
-        [presets."P"]
-        kanata_config = ["/tmp/a.kbd", "~/b.kbd"]
-        """).presets[0]
-        XCTAssertEqual(preset.configPaths, ["/tmp/a.kbd", "/Users/test/b.kbd"])
-        XCTAssertTrue(preset.supportsConfigCycling)
+        XCTAssertEqual(preset.configPath, "/Users/test/a.kbd")
     }
 
     func testMissingKanataConfigFails() {
@@ -149,18 +139,19 @@ final class KanataConfigShapeTests: XCTestCase {
         }
     }
 
-    func testEmptyArrayFails() {
-        assertConfigError("[presets.\"P\"]\nkanata_config = []") { error in
+    func testAnArrayOfPathsFailsAndPointsAtInclude() {
+        assertConfigError("""
+        [presets."P"]
+        kanata_config = ["/tmp/a.kbd", "/tmp/b.kbd"]
+        """) { error in
             XCTAssertEqual(error.keyPath, "presets.P.kanata_config")
+            XCTAssertTrue(error.reason.contains("include"), error.reason)
         }
     }
 
-    func testNonStringArrayElementNamesTheIndex() {
-        assertConfigError("""
-        [presets."P"]
-        kanata_config = ["/tmp/a.kbd", 7]
-        """) { error in
-            XCTAssertEqual(error.keyPath, "presets.P.kanata_config[1]")
+    func testANonStringPathFails() {
+        assertConfigError("[presets.\"P\"]\nkanata_config = 7") { error in
+            XCTAssertEqual(error.keyPath, "presets.P.kanata_config")
         }
     }
 }

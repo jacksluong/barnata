@@ -25,7 +25,7 @@ final class IconCatalogTests: XCTestCase {
     }
 
     func testTheFallbackStillAnswersForUnknownLayers() {
-        let preset = Preset(name: "P", configPaths: ["/tmp/a.kbd"], layerIcons: ["base": "command", "*": "circle"])
+        let preset = Preset(name: "P", configPath: "/tmp/a.kbd", layerIcons: ["base": "command", "*": "circle"])
         XCTAssertEqual(preset.iconSymbol(forLayer: "base"), "command")
         XCTAssertEqual(preset.iconSymbol(forLayer: "whatever"), "circle")
     }

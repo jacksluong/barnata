@@ -26,7 +26,6 @@ public struct MenuState: Sendable, Equatable {
     public var configPath: String
     public var configError: String?
     public var presetNames: [String]
-    public var activePresetSupportsCycling: Bool
     public var status: DaemonStatus?
     public var currentUID: uid_t
     public var layers: [String]
@@ -44,7 +43,6 @@ public struct MenuState: Sendable, Equatable {
         configPath: String = "",
         configError: String? = nil,
         presetNames: [String] = [],
-        activePresetSupportsCycling: Bool = false,
         status: DaemonStatus? = nil,
         currentUID: uid_t = 0,
         layers: [String] = [],
@@ -61,7 +59,6 @@ public struct MenuState: Sendable, Equatable {
         self.configPath = configPath
         self.configError = configError
         self.presetNames = presetNames
-        self.activePresetSupportsCycling = activePresetSupportsCycling
         self.status = status
         self.currentUID = currentUID
         self.layers = layers
@@ -126,7 +123,7 @@ public struct MenuState: Sendable, Equatable {
         case .crashed: return "Crashed (exit \(status?.lastExitCode ?? 0))"
         case .idle: return "Not running"
         case .running:
-            let file = (status?.configPaths.first as NSString?)?.lastPathComponent ?? "kanata"
+            let file = (status?.configPath as NSString?)?.lastPathComponent ?? "kanata"
             guard let currentLayer else { return "Running (\(file))" }
             return "Running (\(file), layer: \(currentLayer))"
         }

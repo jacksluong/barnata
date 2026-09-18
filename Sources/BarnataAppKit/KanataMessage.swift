@@ -7,8 +7,6 @@ public enum KanataClientMessage: Sendable, Equatable {
     case requestCurrentLayerName
     case changeLayer(String)
     case reload
-    case reloadNext
-    case reloadPrevious
 
     var payload: (name: String, body: [String: String]) {
         switch self {
@@ -17,8 +15,6 @@ public enum KanataClientMessage: Sendable, Equatable {
         case .requestCurrentLayerName: ("RequestCurrentLayerName", [:])
         case .changeLayer(let name): ("ChangeLayer", ["new": name])
         case .reload: ("Reload", [:])
-        case .reloadNext: ("ReloadNext", [:])
-        case .reloadPrevious: ("ReloadPrev", [:])
         }
     }
 

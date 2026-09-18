@@ -141,21 +141,11 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertNil(MenuBuilder.entries(for: readyState()).submenu(titled: "Layers"))
     }
 
-    func testConfigCyclingItemsOnlyAppearForAMultiFilePreset() {
-        XCTAssertNil(MenuBuilder.entries(for: runningState()).item(titled: "Next config file"))
-
-        var cycling = runningState()
-        cycling.activePresetSupportsCycling = true
-        let entries = MenuBuilder.entries(for: cycling)
-        XCTAssertEqual(entries.item(titled: "Next config file")?.action, .nextConfigFile)
-        XCTAssertEqual(entries.item(titled: "Previous config file")?.action, .previousConfigFile)
-    }
-
     func testRunningForAnotherUserEnablesOnlyStop() {
         let state = readyState(status: daemonStatus(
             state: .running,
             presetName: "Default",
-            configPaths: ["/Users/other/.config/kanata/example.kbd"],
+            configPath: "/Users/other/.config/kanata/example.kbd",
             tcpPort: 5829,
             ownerUID: otherUID
         ))

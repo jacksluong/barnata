@@ -171,7 +171,6 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
     private func apply(_ status: DaemonStatus) {
         state.status = status
-        state.activePresetSupportsCycling = status.configPaths.count > 1
 
         if status.state == .running, !state.isRunningForAnotherUser, let port = status.tcpPort {
             tcpClient.connect(port: port)
@@ -389,12 +388,6 @@ public final class AppController: NSObject, NSApplicationDelegate {
 
         case .reloadConfig:
             tcpClient.send(.reload)
-
-        case .nextConfigFile:
-            tcpClient.send(.reloadNext)
-
-        case .previousConfigFile:
-            tcpClient.send(.reloadPrevious)
 
         case .openKanataLog:
             setup.open(AppBundle.kanataLogURL)

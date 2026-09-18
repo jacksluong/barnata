@@ -105,17 +105,17 @@ struct NoValidation: BinaryValidating {
 
 func makeRequest(
     presetName: String = "Default",
-    configPaths: [String] = ["/Users/test/.config/kanata/example.kbd"],
+    configPath: String? = "/Users/test/.config/kanata/example.kbd",
     extraArgs: [String] = [],
     autorestartOnCrash: Bool = false
 ) -> ValidatedStartRequest {
     ValidatedStartRequest(
         presetName: presetName,
-        configPaths: configPaths,
+        configPath: configPath,
         extraArgs: extraArgs,
         autorestartOnCrash: autorestartOnCrash,
         ownerUID: callerUID,
-        arguments: ["-c", configPaths[0], "--no-wait"]
+        arguments: ["-c", configPath ?? "", "--no-wait"]
     )
 }
 

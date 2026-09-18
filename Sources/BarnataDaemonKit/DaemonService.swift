@@ -131,7 +131,7 @@ final class DaemonService: NSObject, BarnataDaemonProtocol, @unchecked Sendable 
             state: snapshot.state,
             pid: snapshot.pid,
             presetName: snapshot.presetName,
-            configPaths: snapshot.configPaths,
+            configPath: snapshot.configPath,
             tcpPort: snapshot.tcpPort,
             ownerUID: snapshot.ownerUID,
             lastExitCode: snapshot.lastExitCode,

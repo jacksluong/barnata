@@ -5,7 +5,7 @@ public struct SupervisorSnapshot: Sendable, Equatable {
     public var state: KanataState = .idle
     public var pid: pid_t?
     public var presetName: String?
-    public var configPaths: [String] = []
+    public var configPath: String?
     public var tcpPort: Int?
     public var ownerUID: uid_t?
     public var lastExitCode: Int32?
@@ -315,7 +315,7 @@ public final class ProcessSupervisor: @unchecked Sendable {
             state: state,
             pid: currentPID,
             presetName: request?.presetName,
-            configPaths: request?.configPaths ?? [],
+            configPath: request?.configPath,
             tcpPort: currentPort,
             ownerUID: request?.ownerUID,
             lastExitCode: lastExitCode,

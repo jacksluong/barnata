@@ -25,7 +25,7 @@ func driverStatus(
 func daemonStatus(
     state: KanataState = .idle,
     presetName: String? = nil,
-    configPaths: [String] = [],
+    configPath: String? = nil,
     tcpPort: Int? = nil,
     ownerUID: uid_t? = nil,
     lastExitCode: Int32? = nil,
@@ -38,7 +38,7 @@ func daemonStatus(
         state: state,
         pid: state == .running ? 4242 : nil,
         presetName: presetName,
-        configPaths: configPaths,
+        configPath: configPath,
         tcpPort: tcpPort,
         ownerUID: ownerUID,
         lastExitCode: lastExitCode,
@@ -72,7 +72,7 @@ func runningState(layer: String? = "base") -> MenuState {
         status: daemonStatus(
             state: .running,
             presetName: "Default",
-            configPaths: ["/Users/test/.config/kanata/example.kbd"],
+            configPath: "/Users/test/.config/kanata/example.kbd",
             tcpPort: 5829,
             ownerUID: testUID
         ),

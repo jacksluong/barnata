@@ -48,7 +48,7 @@ public struct Preset: Sendable, Equatable {
     public static let layerIconFallbackKey = "*"
 
     public var name: String
-    public var configPaths: [String]
+    public var configPath: String
     public var autorun: Bool
     public var autorestartOnCrash: Bool
     public var extraArgs: [String]
@@ -56,27 +56,24 @@ public struct Preset: Sendable, Equatable {
 
     public init(
         name: String,
-        configPaths: [String],
+        configPath: String,
         autorun: Bool = false,
         autorestartOnCrash: Bool = false,
         extraArgs: [String] = [],
         layerIcons: [String: String] = [:]
     ) {
         self.name = name
-        self.configPaths = configPaths
+        self.configPath = configPath
         self.autorun = autorun
         self.autorestartOnCrash = autorestartOnCrash
         self.extraArgs = extraArgs
         self.layerIcons = layerIcons
     }
 
-    /// True when the preset lists more than one config file, which enables ReloadNext and ReloadPrev
-    public var supportsConfigCycling: Bool { configPaths.count > 1 }
-
     public var startRequest: StartRequest {
         StartRequest(
             presetName: name,
-            configPaths: configPaths,
+            configPath: configPath,
             extraArgs: extraArgs,
             autorestartOnCrash: autorestartOnCrash
         )

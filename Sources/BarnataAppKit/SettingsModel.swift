@@ -51,10 +51,10 @@ public enum SettingsTab: String, CaseIterable, Sendable {
 /// One config file reference, which is one `[presets."Name"]` table
 public struct ConfigEntry: Identifiable, Equatable {
     public var name: String
-    public var paths: [String]
+    public var path: String
     public var layerIcons: [String: String]
     public var autorun: Bool
-    public var missingPaths: Set<String>
+    public var isMissing: Bool
 
     public var id: String { name }
 
@@ -117,10 +117,10 @@ public final class SettingsModel: ObservableObject {
             entries = loaded.presets.map { preset in
                 ConfigEntry(
                     name: preset.name,
-                    paths: preset.configPaths,
+                    path: preset.configPath,
                     layerIcons: preset.layerIcons,
                     autorun: preset.autorun,
-                    missingPaths: Set(preset.configPaths.filter { !FileManager.default.fileExists(atPath: $0) })
+                    isMissing: !FileManager.default.fileExists(atPath: preset.configPath)
                 )
             }
         } catch {
@@ -142,7 +142,7 @@ public final class SettingsModel: ObservableObject {
             layers = []
             return
         }
-        layers = entry.paths.flatMap { KanataConfigScanner.layers(in: URL(fileURLWithPath: $0)) }.uniqued()
+        layers = KanataConfigScanner.layers(in: URL(fileURLWithPath: entry.path))
     }
 
     // MARK: - System state
@@ -171,34 +171,25 @@ public final class SettingsModel: ObservableObject {
 
     // MARK: - Config files
 
-    /// Adds a reference to each chosen file. Nothing is copied into the Barnata folder.
-    public func addConfigFiles() {
+    /// Adds a reference to the chosen file. Nothing is copied into the Barnata folder.
+    public func addConfigFile() {
         let panel = NSOpenPanel()
-        panel.title = "Add kanata config files"
+        panel.title = "Add a kanata config file"
         panel.prompt = "Add"
         panel.message = "Barnata stores a reference to the file. The file is not copied or moved."
-        panel.allowsMultipleSelection = true
+        panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowedContentTypes = [UTType(filenameExtension: "kbd"), .plainText, .text].compactMap { $0 }
 
-        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return }
-        add(panel.urls)
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        add(url)
     }
 
-    public func add(_ urls: [URL]) {
-        var taken = Set(entries.map(\.name))
-        var added: [String] = []
-
-        apply { document in
-            for url in urls {
-                let name = SettingsModel.uniqueName(from: url, taken: taken)
-                taken.insert(name)
-                added.append(name)
-                ConfigWriter.addPreset(name, configPath: url.standardizedFileURL.path, to: &document)
-            }
-        }
-        selection = added.last ?? selection
+    public func add(_ url: URL) {
+        let name = SettingsModel.uniqueName(from: url, taken: Set(entries.map(\.name)))
+        apply { ConfigWriter.addPreset(name, configPath: url.standardizedFileURL.path, to: &$0) }
+        selection = name
         selectionDidChange()
     }
 
@@ -222,8 +213,8 @@ public final class SettingsModel: ObservableObject {
         selectionDidChange()
     }
 
-    public func reveal(_ paths: [String]) {
-        NSWorkspace.shared.activateFileViewerSelecting(paths.map { URL(fileURLWithPath: $0) })
+    public func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 
     nonisolated static func uniqueName(from url: URL, taken: Set<String>) -> String {
@@ -323,12 +314,5 @@ public final class SettingsModel: ObservableObject {
             errorMessage = "Cannot write \(configURL.lastPathComponent): \(error.localizedDescription)"
         }
         reload()
-    }
-}
-
-extension Array where Element: Hashable {
-    func uniqued() -> [Element] {
-        var seen: Set<Element> = []
-        return filter { seen.insert($0).inserted }
     }
 }

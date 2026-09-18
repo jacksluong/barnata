@@ -164,7 +164,7 @@ final class PresetWritingTests: XCTestCase {
         }
         let config = try parseConfig(result)
         XCTAssertEqual(config.presets.map(\.name), ["Default", "Gaming"])
-        XCTAssertEqual(config.preset(named: "Gaming")?.configPaths, ["/Users/test/keys/gaming.kbd"])
+        XCTAssertEqual(config.preset(named: "Gaming")?.configPath, "/Users/test/keys/gaming.kbd")
         XCTAssertEqual(config.preset(named: "Gaming")?.autorun, false)
     }
 

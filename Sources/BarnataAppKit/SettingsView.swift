@@ -189,7 +189,7 @@ private struct ConfigsTab: View {
             .onChange(of: model.selection) { model.selectionDidChange() }
 
             ControlGroup {
-                Button { model.addConfigFiles() } label: { Image(systemName: "plus") }
+                Button { model.addConfigFile() } label: { Image(systemName: "plus") }
                     .help("Add a kanata config file")
                 Button { confirmingDelete = model.selectedEntry } label: { Image(systemName: "minus") }
                     .disabled(model.selectedEntry == nil)
@@ -209,7 +209,7 @@ private struct ConfigsTab: View {
         } else {
             VStack(spacing: 10) {
                 Text("No config selected").foregroundStyle(.secondary)
-                Button("Add Config File…") { model.addConfigFiles() }
+                Button("Add Config File…") { model.addConfigFile() }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -224,7 +224,7 @@ private struct ConfigRow: View {
         HStack(spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(entry.name).lineLimit(1)
-                Text(entry.paths.map { ($0 as NSString).lastPathComponent }.joined(separator: ", "))
+                Text((entry.path as NSString).lastPathComponent)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -235,10 +235,10 @@ private struct ConfigRow: View {
                     .foregroundStyle(.tint)
                     .help("Running now")
             }
-            if !entry.missingPaths.isEmpty || entry.hasInvalidIcons {
+            if entry.isMissing || entry.hasInvalidIcons {
                 Image(systemName: IconCatalog.warningSymbol)
                     .foregroundStyle(.orange)
-                    .help(entry.missingPaths.isEmpty ? "Some icons are not available" : "Some files are missing")
+                    .help(entry.isMissing ? "This file is missing" : "Some icons are not available")
             }
         }
         .padding(.vertical, 2)
@@ -260,16 +260,16 @@ private struct ConfigDetail: View {
                     .onSubmit(commitName)
                 LabeledContent("File") {
                     HStack(spacing: 8) {
-                        if !entry.missingPaths.isEmpty {
+                        if entry.isMissing {
                             Image(systemName: IconCatalog.warningSymbol)
                                 .foregroundStyle(.orange)
                                 .help("This file no longer exists")
                         }
-                        Text(entry.paths.map { ($0 as NSString).lastPathComponent }.joined(separator: ", "))
+                        Text((entry.path as NSString).lastPathComponent)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
-                        Button("Show in Finder") { model.reveal(entry.paths) }
+                        Button("Show in Finder") { model.reveal(entry.path) }
                     }
                 }
             }

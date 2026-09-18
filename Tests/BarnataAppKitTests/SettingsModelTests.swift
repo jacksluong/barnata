@@ -55,10 +55,10 @@ final class SettingsModelTests: XCTestCase {
     func testAddingAFileStoresOnlyAReferenceToIt() throws {
         let kbd = try writeConfigFile(named: "home.kbd", layers: ["base", "typing"])
         let model = try makeModel()
-        model.add([kbd])
+        model.add(kbd)
 
         XCTAssertEqual(model.entries.map(\.name), ["home"])
-        XCTAssertEqual(model.entries.first?.paths, [kbd.standardizedFileURL.path])
+        XCTAssertEqual(model.entries.first?.path, kbd.standardizedFileURL.path)
         XCTAssertEqual(model.layers, ["base", "typing"])
 
         // Nothing is copied next to config.toml
@@ -73,7 +73,8 @@ final class SettingsModelTests: XCTestCase {
         let second = try writeConfigFile(named: "nested/home.kbd", layers: ["other"])
 
         let model = try makeModel()
-        model.add([first, second])
+        model.add(first)
+        model.add(second)
         XCTAssertEqual(model.entries.map(\.name), ["home", "home 2"])
     }
 
@@ -82,8 +83,8 @@ final class SettingsModelTests: XCTestCase {
         let second = try writeConfigFile(named: "b.kbd", layers: ["other"])
 
         let model = try makeModel()
-        model.add([first])
-        model.add([second])
+        model.add(first)
+        model.add(second)
         XCTAssertEqual(model.selection, "b")
         XCTAssertEqual(model.layers, ["other"])
     }
@@ -91,7 +92,7 @@ final class SettingsModelTests: XCTestCase {
     func testRenamingWritesTheNewLabelAndKeepsTheReference() throws {
         let kbd = try writeConfigFile(named: "home.kbd", layers: ["base"])
         let model = try makeModel()
-        model.add([kbd])
+        model.add(kbd)
         model.rename(model.entries[0], to: "Home Row")
 
         XCTAssertEqual(model.entries.map(\.name), ["Home Row"])
@@ -103,7 +104,8 @@ final class SettingsModelTests: XCTestCase {
         let first = try writeConfigFile(named: "a.kbd", layers: ["base"])
         let second = try writeConfigFile(named: "b.kbd", layers: ["base"])
         let model = try makeModel()
-        model.add([first, second])
+        model.add(first)
+        model.add(second)
 
         model.rename(model.entries[0], to: "b")
         XCTAssertNotNil(model.errorMessage)
@@ -113,7 +115,7 @@ final class SettingsModelTests: XCTestCase {
     func testDeletingRemovesTheReferenceButNotTheFile() throws {
         let kbd = try writeConfigFile(named: "home.kbd", layers: ["base"])
         let model = try makeModel()
-        model.add([kbd])
+        model.add(kbd)
         model.delete(model.entries[0])
 
         XCTAssertEqual(model.entries, [])
@@ -124,7 +126,7 @@ final class SettingsModelTests: XCTestCase {
     func testDeletingTheRunningConfigStopsKanataFirst() throws {
         let kbd = try writeConfigFile(named: "home.kbd", layers: ["base"])
         let model = try makeModel()
-        model.add([kbd])
+        model.add(kbd)
         model.activePresetName = "home"
         model.delete(model.entries[0])
 
@@ -137,7 +139,7 @@ final class SettingsModelTests: XCTestCase {
         kanata_config = "/nope/missing.kbd"
         """)
         XCTAssertEqual(model.entries.map(\.name), ["Gone"])
-        XCTAssertEqual(model.entries[0].missingPaths, ["/nope/missing.kbd"])
+        XCTAssertTrue(model.entries[0].isMissing)
         XCTAssertEqual(model.layers, [])
     }
 
@@ -151,7 +153,7 @@ final class SettingsModelTests: XCTestCase {
     func testSettingAnIconWritesASymbolNameIntoThePreset() throws {
         let kbd = try writeConfigFile(named: "home.kbd", layers: ["base"])
         let model = try makeModel()
-        model.add([kbd])
+        model.add(kbd)
         model.setIcon("command", for: "base", in: model.entries[0])
 
         XCTAssertEqual(model.entries[0].layerIcons, ["base": "command"])
@@ -161,7 +163,7 @@ final class SettingsModelTests: XCTestCase {
     func testClearingAnIconRemovesIt() throws {
         let kbd = try writeConfigFile(named: "home.kbd", layers: ["base"])
         let model = try makeModel()
-        model.add([kbd])
+        model.add(kbd)
         model.setIcon("command", for: "base", in: model.entries[0])
         model.setIcon(nil, for: "base", in: model.entries[0])
 
@@ -188,7 +190,7 @@ final class SettingsModelTests: XCTestCase {
         [app]
         show_dock_icon = false   # keep this comment
         """)
-        model.add([kbd])
+        model.add(kbd)
         model.setIcon("command", for: "base", in: model.entries[0])
 
         let written = try text()
@@ -206,7 +208,7 @@ final class SettingsModelTests: XCTestCase {
         // The view calls the same entry point from onSubmit and from a focus change
         let kbd = try writeConfigFile(named: "home.kbd", layers: ["base"])
         let model = try makeModel()
-        model.add([kbd])
+        model.add(kbd)
         model.rename(model.entries[0], to: "  Padded  ")
 
         XCTAssertEqual(model.entries.map(\.name), ["Padded"])

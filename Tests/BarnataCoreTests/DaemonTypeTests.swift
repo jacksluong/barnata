@@ -7,7 +7,7 @@ final class DaemonTypeTests: XCTestCase {
     func testStartRequestSurvivesAnEnvelopeRoundTrip() throws {
         let request = StartRequest(
             presetName: "Default",
-            configPaths: ["/Users/test/.config/kanata/example.kbd"],
+            configPath: "/Users/test/.config/kanata/example.kbd",
             extraArgs: ["--debug"],
             autorestartOnCrash: true
         )
@@ -21,7 +21,7 @@ final class DaemonTypeTests: XCTestCase {
             state: .running,
             pid: 4242,
             presetName: "Default",
-            configPaths: ["/tmp/a.kbd"],
+            configPath: "/tmp/a.kbd",
             tcpPort: 5829,
             restartCount: 2,
             driver: DriverStatus(installed: true, version: "6.8.0", requiredVersion: "6.8.0", activated: true)
@@ -37,14 +37,14 @@ final class DaemonTypeTests: XCTestCase {
     func testPresetBuildsTheStartRequestTheDaemonExpects() {
         let preset = Preset(
             name: "Default",
-            configPaths: ["/tmp/a.kbd"],
+            configPath: "/tmp/a.kbd",
             autorun: true,
             autorestartOnCrash: true,
             extraArgs: ["--quiet"]
         )
         let request = preset.startRequest
         XCTAssertEqual(request.presetName, "Default")
-        XCTAssertEqual(request.configPaths, ["/tmp/a.kbd"])
+        XCTAssertEqual(request.configPath, "/tmp/a.kbd")
         XCTAssertTrue(request.autorestartOnCrash)
         XCTAssertEqual(request.extraArgs, ["--quiet"])
     }

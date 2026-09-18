@@ -10,10 +10,10 @@ final class RequestValidatorTests: XCTestCase {
         RequestValidator(inspector: FakeFileInspector(files: files))
     }
 
-    private func request(configPaths: [String]? = nil, extraArgs: [String] = []) -> StartRequest {
+    private func request(configPath: String? = nil, extraArgs: [String] = []) -> StartRequest {
         StartRequest(
             presetName: "Default",
-            configPaths: configPaths ?? [goodPath],
+            configPath: configPath ?? goodPath,
             extraArgs: extraArgs
         )
     }
@@ -46,16 +46,9 @@ final class RequestValidatorTests: XCTestCase {
         XCTAssertEqual(validated.arguments, ["-c", goodPath, "--no-wait", "--debug"])
     }
 
-    func testEveryConfigPathBecomesItsOwnFlag() throws {
-        let second = "/Users/test/.config/kanata/other.kbd"
-        let validated = try validator([goodPath: .regularFile(), second: .regularFile()])
-            .validate(request(configPaths: [goodPath, second]), ownerUID: callerUID)
-        XCTAssertEqual(validated.arguments.prefix(4), ["-c", goodPath, "-c", second])
-    }
-
     func testRelativePathIsRejected() {
         assertRejected(
-            request(configPaths: ["example.kbd"]),
+            request(configPath: "example.kbd"),
             files: ["example.kbd": .regularFile()],
             rule: "config path must be absolute",
             detailContains: "example.kbd is relative"
@@ -73,7 +66,7 @@ final class RequestValidatorTests: XCTestCase {
 
     func testDirectoryIsRejected() {
         assertRejected(
-            request(configPaths: ["/Users/test/.config/kanata"]),
+            request(configPath: "/Users/test/.config/kanata"),
             files: ["/Users/test/.config/kanata": .directory()],
             rule: "config path must be a regular file",
             detailContains: "is not a regular file"
@@ -83,7 +76,7 @@ final class RequestValidatorTests: XCTestCase {
     /// stat follows symlinks, so a link to a directory looks like a directory here
     func testSymlinkToADirectoryIsRejected() {
         assertRejected(
-            request(configPaths: ["/Users/test/link-to-configs"]),
+            request(configPath: "/Users/test/link-to-configs"),
             files: ["/Users/test/link-to-configs": .directory()],
             rule: "config path must be a regular file",
             detailContains: "is not a regular file"
@@ -113,12 +106,12 @@ final class RequestValidatorTests: XCTestCase {
         )
     }
 
-    func testEmptyConfigListIsRejected() {
+    func testAnEmptyConfigPathIsRejected() {
         assertRejected(
-            request(configPaths: []),
+            request(configPath: ""),
             files: [:],
             rule: "config path",
-            detailContains: "at least one config file"
+            detailContains: "needs a config file"
         )
     }
 }

@@ -10,8 +10,6 @@ final class KanataClientMessageTests: XCTestCase {
         XCTAssertEqual(KanataClientMessage.requestCurrentLayerName.line, "{\"RequestCurrentLayerName\":{}}")
         XCTAssertEqual(KanataClientMessage.changeLayer("base").line, "{\"ChangeLayer\":{\"new\":\"base\"}}")
         XCTAssertEqual(KanataClientMessage.reload.line, "{\"Reload\":{}}")
-        XCTAssertEqual(KanataClientMessage.reloadNext.line, "{\"ReloadNext\":{}}")
-        XCTAssertEqual(KanataClientMessage.reloadPrevious.line, "{\"ReloadPrev\":{}}")
     }
 
     func testALayerNameWithAQuoteIsEscaped() {
@@ -24,7 +22,7 @@ final class KanataClientMessageTests: XCTestCase {
     func testEveryLineIsValidJSON() throws {
         let messages: [KanataClientMessage] = [
             .hello, .requestLayerNames, .requestCurrentLayerName,
-            .changeLayer("a\"b\\c"), .reload, .reloadNext, .reloadPrevious,
+            .changeLayer("a\"b\\c"), .reload,
         ]
         for message in messages {
             let data = Data(message.line.utf8)
