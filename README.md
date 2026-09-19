@@ -85,7 +85,7 @@ Status icons replace the menu bar image for each state. Name the files `default`
 
 ## Uninstall
 
-The best way to uninstall is through the Uninstall button in the Preferences window. Uninstalling through Homebrew will result in an orphaned "not found" entry in Login Items.
+The best way to uninstall is through the Uninstall button in the Preferences window. Uninstalling through Homebrew will result in an orphaned entry in Login Items.
 
 ## License
 
