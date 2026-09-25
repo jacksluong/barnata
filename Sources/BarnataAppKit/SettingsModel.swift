@@ -309,19 +309,20 @@ public final class SettingsModel: ObservableObject {
 
     public var updateButtonTitle: String {
         if isUpdating { return "Updating\u{2026}" }
-        if availableUpdate != nil { return "Update" }
-        return isCheckingForUpdate ? "Checking\u{2026}" : "Check for updates"
+        return availableUpdate != nil ? "Update" : "Check for updates"
     }
 
     public var isUpdateButtonEnabled: Bool { !isUpdating && !isCheckingForUpdate }
 
-    /// One button for both jobs: install a known update, or go look for one
+    /// One button for both jobs: go look for an update, or install the newest one once one is known
     public func updateButtonTapped() {
-        guard availableUpdate == nil else { return showUpdate() }
-        checkForUpdatesNow()
+        let wasKnown = availableUpdate != nil
+        checkForUpdatesNow { [weak self] update in
+            if wasKnown, update != nil { self?.showUpdate() }
+        }
     }
 
-    public func checkForUpdatesNow() {
+    public func checkForUpdatesNow(then completion: ((AvailableUpdate?) -> Void)? = nil) {
         guard !isCheckingForUpdate else { return }
         isCheckingForUpdate = true
         hideUpToDateNotice()
@@ -330,6 +331,7 @@ public final class SettingsModel: ObservableObject {
             isCheckingForUpdate = false
             availableUpdate = update
             if update == nil { showUpToDateNotice() }
+            completion?(update)
         }
     }
 

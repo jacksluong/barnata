@@ -442,7 +442,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
             tcpClient.send(.reload)
 
         case .showUpdate:
-            offerUpdate()
+            updateChecker.check { [weak self] _ in self?.offerUpdate() }
 
         case .openKanataLog:
             setup.open(AppBundle.kanataLogURL)

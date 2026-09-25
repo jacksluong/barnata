@@ -246,9 +246,30 @@ final class SettingsModelTests: XCTestCase {
     func testTheButtonInstallsOnceAnUpdateIsKnown() throws {
         let model = try makeModel()
         model.availableUpdate = AvailableUpdate(version: "9.9.9")
+        updateToFind = AvailableUpdate(version: "9.9.9")
         model.updateButtonTapped()
 
         XCTAssertEqual(showUpdateCount, 1)
+    }
+
+    func testTheButtonRechecksBeforeInstallingAKnownUpdate() throws {
+        let model = try makeModel()
+        model.availableUpdate = AvailableUpdate(version: "9.9.9")
+        updateToFind = AvailableUpdate(version: "10.0.0")
+        model.updateButtonTapped()
+
+        XCTAssertEqual(model.availableUpdate?.version, "10.0.0")
+        XCTAssertEqual(showUpdateCount, 1)
+    }
+
+    func testTheButtonSkipsTheInstallWhenTheRecheckFindsNothing() throws {
+        let model = try makeModel()
+        model.availableUpdate = AvailableUpdate(version: "9.9.9")
+        model.updateButtonTapped()
+
+        XCTAssertNil(model.availableUpdate)
+        XCTAssertEqual(model.updateNotice, "Up to date")
+        XCTAssertEqual(showUpdateCount, 0)
     }
 
     func testAnUpdateInProgressDisablesTheButton() throws {
