@@ -1,21 +1,38 @@
 #!/bin/bash
 # Cuts a release: tag, build, sign, notarize, publish, bump the cask.
 #
-# Usage: Scripts/release.sh <version> [--dry-run]
+# Usage: Scripts/release.sh <version> [--dry-run] [note...]
 #   <version>   semver without the leading v, e.g. 0.1.0
 #   --dry-run   build and notarize only, no tag push and no GitHub release
+#   note        one bullet item of the release notes, e.g. "Simplified the update panel."
 set -euo pipefail
 
 source "$(dirname "$0")/vars.sh"
 
 VERSION="${1:-}"
+shift || true
 DRY_RUN=0
-[[ "${2:-}" == "--dry-run" ]] && DRY_RUN=1
+NOTES=""
+for arg in "$@"; do
+  if [[ "$arg" == "--dry-run" ]]; then
+    DRY_RUN=1
+  else
+    NOTES+="${NOTES:+$'\n'}- ${arg}"
+  fi
+done
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "usage: Scripts/release.sh <version> [--dry-run]" >&2
+  echo "usage: Scripts/release.sh <version> [--dry-run] [note...]" >&2
   exit 1
 fi
+
+echo "==> Release notes for v${VERSION}"
+echo
+echo "${NOTES:-(none)}"
+echo
+read -r -p "Continue? [y/N] " REPLY
+[[ "$REPLY" =~ ^[Yy]$ ]] || { echo "cancelled"; exit 1; }
+
 TAG="v${VERSION}"
 RELEASE_ZIP="${BUILD_DIR}/${APP_NAME}-${VERSION}.zip"
 
@@ -61,7 +78,7 @@ echo "==> Creating the GitHub release"
 gh release create "$TAG" "$RELEASE_ZIP" \
   --repo "$GITHUB_REPO" \
   --title "$TAG" \
-  --notes "Install with \`brew install --cask ${CASK_TOKEN}\`."
+  --notes "$NOTES"
 
 CASK="${TAP_DIR}/Casks/${CASK_NAME}.rb"
 if [[ -f "$CASK" ]]; then

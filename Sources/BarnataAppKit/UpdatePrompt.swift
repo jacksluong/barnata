@@ -14,11 +14,8 @@ public enum UpdatePrompt {
 
     public static func ask(about update: AvailableUpdate, currentVersion: String) -> Choice {
         let alert = NSAlert()
-        alert.messageText = "Barnata \(update.version) is available"
-        alert.informativeText = """
-            You have \(currentVersion). Barnata updates itself with Homebrew, which quits the \
-            app, installs the new version, and starts it again.
-            """
+        alert.messageText = "A new update is available"
+        alert.informativeText = "Good news! Barnata v\(update.version) is available (you have v\(currentVersion))."
         alert.addButton(withTitle: "Update")
         alert.addButton(withTitle: "Later").keyEquivalent = "\u{1b}"
         if let notes = update.notes {
