@@ -17,7 +17,7 @@
 
 [kanata](https://github.com/jtroo/kanata) runs as root under a launchd daemon registered from the app bundle.
 
-Inspired by [kanata-tray](https://github.com/rszyma/kanata-tray). Barnata handles the setup for you: one approval in System Settings registers the daemon, permissions stay granted across kanata updates, and a settings window covers the common customization.
+Inspired by [kanata-tray](https://github.com/rszyma/kanata-tray). Barnata simplifies the setup for you, with clear permissions required in System Settings, permissions that persist across kanata updates, and a settings window for easy customization.
 
 ## Install
 
@@ -25,13 +25,21 @@ Inspired by [kanata-tray](https://github.com/rszyma/kanata-tray). Barnata handle
 brew install --cask jacksluong/tap/barnata
 ```
 
-Barnata checks GitHub for a newer release once a day. When one is out, **Update available** appears in the menu bar menu and at the bottom of the **General** tab. Running it quits Barnata, upgrades the cask with Homebrew, and opens the new version. The output goes to `~/Library/Logs/Barnata/update.log`.
+The app automatically checks for updates.
 
 ## Usage
 
 Open Preferences from the menu bar icon.
 
 In **General**, all three permission rows need a green check before kanata can start. (Note: Accessibility is known as Device Control and Data Access on macOS 27 and later.)
+
+<p align="center">
+  <img
+    alt="Barnata settings window, General tab"
+    width="832"
+    src=".github/assets/general.png"
+  />
+</p>
 
 **Configs** holds your kanata config files. Press `+` to add one. Each entry is a preset: a name, one `.kbd` file, and an icon per layer. To pull in configuration from more than one `.kbd` file, use kanata's [`include` keyword](https://github.com/jtroo/kanata/blob/main/docs/config.adoc#include-other-files).
 
@@ -41,7 +49,7 @@ Layer icons are [SF Symbols](https://developer.apple.com/sf-symbols/). The picke
   <img
     alt="Barnata settings window, Configs tab"
     width="832"
-    src=".github/assets/settings.png"
+    src=".github/assets/configs.png"
   />
 </p>
 
@@ -52,7 +60,7 @@ Presets appear in the menu bar. Click a preset to start it, click it again to st
     alt="Barnata menu bar icon and menu"
     width="343"
     src=".github/assets/menu-bar.png"
-  />
+  />l 
 </p>
 
 ### Config file
@@ -81,11 +89,11 @@ nav = "arrow.up.arrow.down"
 kanata_config = "~/.config/kanata/fps.kbd"
 ```
 
-Status icons replace the menu bar image for each state. Name the files `default`, `crashed`, `paused`, or `reloading`. A `Template` suffix, as in `defaultTemplate.png`, makes macOS tint the image to match the menu bar.
+If provided, status icons replace the default menu bar image for each state. Name the files `default`, `crashed`, `paused`, or `reloading`. A `Template` suffix, as in `defaultTemplate.png`, makes macOS tint the image to match the menu bar.
 
 ## Uninstall
 
-The best way to uninstall is through the Uninstall button in the Preferences window. Uninstalling through Homebrew will result in an orphaned "not found" entry in Login Items.
+The best way to uninstall is through the Uninstall button in the Preferences window. Uninstalling through Homebrew will result in an orphaned entry in Login Items.
 
 ## License
 

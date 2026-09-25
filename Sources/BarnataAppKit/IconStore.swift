@@ -7,7 +7,7 @@ import Foundation
 @MainActor
 public final class IconStore {
     /// Every image is fitted into this square so the status item never changes width
-    public static let imageSize: CGFloat = 18
+    public static let imageSize: CGFloat = 20
 
     private static let symbolNames: [IconResolver.StatusIcon: String] = [
         .normal: "keyboard",
@@ -64,10 +64,21 @@ public final class IconStore {
         let configured = image.withSymbolConfiguration(
             NSImage.SymbolConfiguration(pointSize: 15, weight: .regular)
         ) ?? image
-        configured.isTemplate = true
-        resize(configured)
-        cache[key] = configured
-        return configured
+        let flattened = flatten(configured)
+        flattened.accessibilityDescription = name
+        resize(flattened)
+        cache[key] = flattened
+        return flattened
+    }
+
+    /// A plain image of the symbol, since the status bar clips symbol images on some displays
+    private func flatten(_ symbol: NSImage) -> NSImage {
+        let image = NSImage(size: symbol.size, flipped: false) { rect in
+            symbol.draw(in: rect)
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     /// Fit inside the square, so a wide icon shrinks instead of widening the status item
