@@ -1,9 +1,11 @@
 # Single source of truth for names, versions, and signing. Sourced by every script.
 
 APP_NAME="Barnata"
-BUNDLE_ID="io.jackyluong.barnata"
+BUNDLE_ID="com.jackyluong.barnata"
 DAEMON_LABEL="${BUNDLE_ID}.daemon"
 KANATA_ID="${BUNDLE_ID}.kanata"
+# Identifier releases through 0.3.4 shipped under, kept so the app can unregister their daemon
+LEGACY_BUNDLE_ID="io.jackyluong.barnata"
 
 TEAM_ID="EE3526PL64"
 SIGNING_IDENTITY="E20ADF15A9A4E3839E3E0D9BC60B5DBE81BD2F8D"   # Developer ID Application: Jacky Luong, expires 2031-09-05

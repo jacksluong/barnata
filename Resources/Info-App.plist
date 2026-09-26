@@ -7,7 +7,7 @@
   <key>CFBundleDisplayName</key>
   <string>Barnata</string>
   <key>CFBundleIdentifier</key>
-  <string>io.jackyluong.barnata</string>
+  <string>com.jackyluong.barnata</string>
   <key>CFBundleExecutable</key>
   <string>Barnata</string>
   <key>CFBundlePackageType</key>

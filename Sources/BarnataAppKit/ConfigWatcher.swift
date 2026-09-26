@@ -5,7 +5,7 @@ public final class ConfigWatcher: @unchecked Sendable {
     public static let coalesceInterval: TimeInterval = 0.15
 
     private let url: URL
-    private let queue = DispatchQueue(label: "io.jackyluong.barnata.config-watcher")
+    private let queue = DispatchQueue(label: "com.jackyluong.barnata.config-watcher")
     private var fileSource: DispatchSourceFileSystemObject?
     private var directorySource: DispatchSourceFileSystemObject?
     private var pendingWork: DispatchWorkItem?

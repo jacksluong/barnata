@@ -40,6 +40,9 @@ cp "${BUILD_DIR}/kanata" "${CONTENTS}/MacOS/kanata"
 sed -e "s/__BUNDLE_VERSION__/${BUNDLE_VERSION}/" -e "s/__SHORT_VERSION__/${SHORT_VERSION}/" \
   "${REPO_ROOT}/Resources/Info-App.plist" > "${CONTENTS}/Info.plist"
 cp "${REPO_ROOT}/Resources/daemon.plist" "${CONTENTS}/Library/LaunchDaemons/${DAEMON_LABEL}.plist"
+# SMAppService only finds a registration whose plist is in the bundle, so the legacy one ships too
+sed "s/${BUNDLE_ID}/${LEGACY_BUNDLE_ID}/g" "${REPO_ROOT}/Resources/daemon.plist" \
+  > "${CONTENTS}/Library/LaunchDaemons/${LEGACY_BUNDLE_ID}.daemon.plist"
 
 DRIVER_PKG_NAME="Karabiner-DriverKit-VirtualHIDDevice-${DRIVER_VERSION}.pkg"
 cp "${BUILD_DIR}/driver.pkg" "${CONTENTS}/Resources/${DRIVER_PKG_NAME}"

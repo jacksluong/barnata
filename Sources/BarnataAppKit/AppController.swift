@@ -75,6 +75,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         tcpClient.onEvent = onMain { [weak self] event in self?.handle(kanataEvent: event) }
 
         installTerminationSignalHandlers()
+        setup.unregisterLegacyDaemon()
         setup.registerDaemon()
         refreshSetupState()
         daemonClient.start()

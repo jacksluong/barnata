@@ -8,6 +8,7 @@ import ServiceManagement
 @MainActor
 public struct SetupActions {
     public static let daemonPlistName = "\(barnataDaemonIdentifier).plist"
+    public static let legacyDaemonPlistName = "\(barnataLegacyDaemonIdentifier).plist"
 
     private static let accessibilityURL = URL(
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
@@ -62,6 +63,18 @@ public struct SetupActions {
             log.notice("unregistered the daemon")
         } catch {
             log.error("cannot unregister the daemon: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Drops the daemon registered under the identifier releases through 0.3.4 used
+    public func unregisterLegacyDaemon() {
+        let legacy = SMAppService.daemon(plistName: SetupActions.legacyDaemonPlistName)
+        guard legacy.status != .notRegistered, legacy.status != .notFound else { return }
+        do {
+            try legacy.unregister()
+            log.notice("unregistered the legacy daemon")
+        } catch {
+            log.error("cannot unregister the legacy daemon: \(error.localizedDescription, privacy: .public)")
         }
     }
 

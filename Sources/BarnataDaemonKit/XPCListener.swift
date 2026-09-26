@@ -12,7 +12,7 @@ public final class XPCListener: NSObject, NSXPCListenerDelegate, @unchecked Send
     private let kanataPath: String
     private let clientRequirement: String?
     private let service: DaemonService
-    private let queue = DispatchQueue(label: "io.jackyluong.barnata.listener")
+    private let queue = DispatchQueue(label: "com.jackyluong.barnata.listener")
     private var idleSince: Date?
     private var idleTimer: DispatchSourceTimer?
     private var orphanTimer: DispatchSourceTimer?

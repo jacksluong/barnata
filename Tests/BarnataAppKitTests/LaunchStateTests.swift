@@ -9,7 +9,7 @@ final class LaunchStateTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        suiteName = "io.jackyluong.barnata.tests.\(UUID().uuidString)"
+        suiteName = "com.jackyluong.barnata.tests.\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: suiteName)!
     }
 

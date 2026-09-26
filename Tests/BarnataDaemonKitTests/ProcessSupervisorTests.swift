@@ -229,7 +229,7 @@ final class ProcessSupervisorTests: XCTestCase {
         let strictSupervisor = ProcessSupervisor(
             configuration: ProcessSupervisor.Configuration(
                 executablePath: "/does/not/matter/kanata",
-                requirement: "identifier \"io.jackyluong.barnata.kanata\""
+                requirement: "identifier \"com.jackyluong.barnata.kanata\""
             ),
             spawner: spawner,
             validator: RejectingValidator(),

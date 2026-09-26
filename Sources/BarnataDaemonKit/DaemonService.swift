@@ -7,7 +7,7 @@ final class DaemonService: NSObject, BarnataDaemonProtocol, @unchecked Sendable 
     private let validator: RequestValidator
     private let supervisor: ProcessSupervisor
     private let driverManager: DriverManager
-    private let queue = DispatchQueue(label: "io.jackyluong.barnata.service")
+    private let queue = DispatchQueue(label: "com.jackyluong.barnata.service")
     private var subscribers: [NSXPCConnection] = []
     private var cachedKanataVersion: String?
     private let onIdleChange: @Sendable () -> Void

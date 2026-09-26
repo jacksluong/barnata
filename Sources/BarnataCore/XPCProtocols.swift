@@ -1,9 +1,11 @@
 import Foundation
 
-public let barnataMachServiceName = "io.jackyluong.barnata.daemon"
-public let barnataAppBundleIdentifier = "io.jackyluong.barnata"
-public let barnataKanataIdentifier = "io.jackyluong.barnata.kanata"
-public let barnataDaemonIdentifier = "io.jackyluong.barnata.daemon"
+public let barnataMachServiceName = "com.jackyluong.barnata.daemon"
+public let barnataAppBundleIdentifier = "com.jackyluong.barnata"
+public let barnataKanataIdentifier = "com.jackyluong.barnata.kanata"
+public let barnataDaemonIdentifier = "com.jackyluong.barnata.daemon"
+/// The daemon identifier of releases through 0.3.4
+public let barnataLegacyDaemonIdentifier = "io.jackyluong.barnata.daemon"
 
 /// Code signing requirement a peer must satisfy, given the build's Team ID
 public func barnataCodeSigningRequirement(teamID: String, identifier: String) -> String {

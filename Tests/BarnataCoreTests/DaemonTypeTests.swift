@@ -52,7 +52,7 @@ final class DaemonTypeTests: XCTestCase {
     func testSigningRequirementNamesTheTeamAndIdentifier() {
         XCTAssertEqual(
             barnataCodeSigningRequirement(teamID: "EE3526PL64", identifier: barnataAppBundleIdentifier),
-            "anchor apple generic and certificate leaf[subject.OU] = \"EE3526PL64\" and identifier \"io.jackyluong.barnata\""
+            "anchor apple generic and certificate leaf[subject.OU] = \"EE3526PL64\" and identifier \"com.jackyluong.barnata\""
         )
     }
 }

@@ -15,7 +15,7 @@ public final class KanataTCPClient: @unchecked Sendable {
     /// kanata sleeps before it binds, so the first seconds after a start are retried quickly
     public static let fastRetryWindow: TimeInterval = 10
 
-    private let queue = DispatchQueue(label: "io.jackyluong.barnata.kanata-tcp")
+    private let queue = DispatchQueue(label: "com.jackyluong.barnata.kanata-tcp")
     private var connection: NWConnection?
     private var wantedPort: Int?
     private var buffer = Data()

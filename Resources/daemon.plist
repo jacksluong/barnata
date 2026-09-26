@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>io.jackyluong.barnata.daemon</string>
+  <string>com.jackyluong.barnata.daemon</string>
   <key>BundleProgram</key>
   <string>Contents/MacOS/barnata-daemon</string>
   <key>MachServices</key>
   <dict>
-    <key>io.jackyluong.barnata.daemon</key>
+    <key>com.jackyluong.barnata.daemon</key>
     <true/>
   </dict>
   <key>AssociatedBundleIdentifiers</key>
   <array>
-    <string>io.jackyluong.barnata</string>
+    <string>com.jackyluong.barnata</string>
   </array>
   <key>ProcessType</key>
   <string>Interactive</string>

@@ -14,7 +14,7 @@ public final class DaemonClient: NSObject, @unchecked Sendable {
     public static let backoffDelays: [TimeInterval] = [1, 2, 4, 8, 16, 30]
 
     private let machServiceName: String
-    private let queue = DispatchQueue(label: "io.jackyluong.barnata.daemon-client")
+    private let queue = DispatchQueue(label: "com.jackyluong.barnata.daemon-client")
     private var connection: NSXPCConnection?
     private var subscription: NSXPCListener?
     private var subscriptionDelegate: SubscriptionDelegate?

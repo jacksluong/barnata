@@ -70,7 +70,7 @@ public final class ProcessSupervisor: @unchecked Sendable {
         validator: BinaryValidating = SignatureCheck(),
         logWriter: LogWriter? = nil,
         scheduler: Scheduler = QueueScheduler(),
-        queue: DispatchQueue = DispatchQueue(label: "io.jackyluong.barnata.supervisor"),
+        queue: DispatchQueue = DispatchQueue(label: "com.jackyluong.barnata.supervisor"),
         onChange: @escaping @Sendable (SupervisorSnapshot) -> Void = { _ in }
     ) {
         self.configuration = configuration
