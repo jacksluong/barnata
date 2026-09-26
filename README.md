@@ -17,7 +17,7 @@
 
 [kanata](https://github.com/jtroo/kanata) runs as root under a launchd daemon registered from the app bundle.
 
-Inspired by [kanata-tray](https://github.com/rszyma/kanata-tray). Barnata simplifies the setup for you, with clear permissions required in System Settings, permissions that persist across kanata updates, and a settings window for easy customization.
+Inspired by [kanata-tray](https://github.com/rszyma/kanata-tray). Barnata simplifies the start-at-login setup for you, with clear permissions required in System Settings, permissions that persist across kanata updates, and a settings window for easy customization.
 
 ## Install
 
