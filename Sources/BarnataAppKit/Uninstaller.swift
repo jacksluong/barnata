@@ -31,7 +31,7 @@ public struct Uninstaller {
 
         guard let bundle = AppBundle.bundleURL else {
             log.notice("running outside an app bundle, nothing to move to the Trash")
-            NSApp.terminate(nil)
+            terminateApp()
             return
         }
 
@@ -40,7 +40,7 @@ public struct Uninstaller {
                 if let error {
                     completion("Cannot move Barnata to the Trash: \(error.localizedDescription)")
                 } else {
-                    NSApp.terminate(nil)
+                    terminateApp()
                 }
             }
         }

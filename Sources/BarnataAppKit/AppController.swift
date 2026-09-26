@@ -100,12 +100,15 @@ public final class AppController: NSObject, NSApplicationDelegate {
             if !result.ok { log.error("daemon shutdown on quit failed: \(result.message ?? "", privacy: .public)") }
             self?.finishTerminating()
         })
-        quitTimer = Timer.scheduledTimer(withTimeInterval: AppController.quitTimeout, repeats: false) { [weak self] _ in
+        let timer = Timer(timeInterval: AppController.quitTimeout, repeats: false) { [weak self] _ in
             MainActor.assumeIsolated {
                 log.error("the daemon did not confirm its shutdown, quitting anyway")
                 self?.finishTerminating()
             }
         }
+        // `.terminateLater` runs the loop in the modal panel mode, where a default mode timer never fires
+        RunLoop.main.add(timer, forMode: .common)
+        quitTimer = timer
         return .terminateLater
     }
 
@@ -130,7 +133,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         for number in [SIGTERM, SIGINT, SIGHUP] {
             signal(number, SIG_IGN)
             let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
-            source.setEventHandler { MainActor.assumeIsolated { NSApp.terminate(nil) } }
+            source.setEventHandler { MainActor.assumeIsolated { terminateApp() } }
             source.resume()
             signalSources.append(source)
         }
@@ -452,7 +455,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
             showSettings()
 
         case .quit:
-            NSApp.terminate(nil)
+            terminateApp()
         }
         render()
     }
@@ -479,7 +482,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         state.isUpdating = true
         render()
         // Homebrew waits for this to finish before it touches the bundle, and opens the new one after
-        NSApp.terminate(nil)
+        terminateApp()
     }
 
     /// Homebrew ran while the app was gone, so its exit code is read back on the next launch

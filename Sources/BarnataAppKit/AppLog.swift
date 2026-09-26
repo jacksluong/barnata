@@ -1,3 +1,4 @@
+import AppKit
 import BarnataCore
 import Foundation
 import os
@@ -11,4 +12,11 @@ func onMain<T: Sendable>(_ body: @escaping @MainActor (T) -> Void) -> @Sendable 
 
 func onMain(_ body: @escaping @MainActor () -> Void) -> @Sendable () -> Void {
     { MainActor.assumeIsolated(body) }
+}
+
+/// `NSApp.terminate` from a run loop callout rather than the caller's stack. `.terminateLater`
+/// waits on daemon replies that arrive on the main queue, which cannot drain inside a main queue block.
+@MainActor
+func terminateApp() {
+    RunLoop.main.perform { MainActor.assumeIsolated { NSApp.terminate(nil) } }
 }
