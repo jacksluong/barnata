@@ -56,7 +56,7 @@ Presets appear in the menu bar. Click a preset to start it, click it again to st
     alt="Barnata menu bar icon and menu"
     width="343"
     src=".github/assets/menu-bar.png"
-  />l 
+  />
 </p>
 
 ### Config file
