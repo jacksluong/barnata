@@ -1,7 +1,7 @@
 import Foundation
 
 /// What Barnata remembers between launches, so a bundle swapped underneath a running app,
-/// which is what a Homebrew upgrade does, comes back on the preset it was running.
+/// which is what an update does, comes back on the preset it was running.
 public struct LaunchState {
     private enum Key {
         static let preset = "lastRunningPreset"

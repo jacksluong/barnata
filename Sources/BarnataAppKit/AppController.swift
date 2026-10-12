@@ -41,6 +41,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private var presetToStartAfterUpdate: String?
     private var isDaemonConnected = false
     private var registrationRepairs = 0
+    private var lastUpdateResult: Int32?
 
     public override init() {
         configURL = ConfigLoader.defaultURL()
@@ -51,6 +52,19 @@ public final class AppController: NSObject, NSApplicationDelegate {
     // MARK: - Startup sequence from 01-architecture.md
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        lastUpdateResult = UpdateInstaller.takeResult()
+        if let bundle = AppBundle.bundleURL {
+            AppMover.finishMove(swapSucceeded: lastUpdateResult == 0, runningBundle: bundle)
+            // Registering the daemon from a DMG or Downloads would point it at a path about to go away
+            if AppMover.needsMove(bundle: bundle) {
+                offerMove(bundle: bundle, onDecline: { [weak self] in self?.finishLaunching() })
+                return
+            }
+        }
+        finishLaunching()
+    }
+
+    private func finishLaunching() {
         state.appVersion = AppBundle.version
         state.currentUID = getuid()
         state.configPath = configURL.path
@@ -60,7 +74,7 @@ public final class AppController: NSObject, NSApplicationDelegate {
         launchState.recordLaunch(version: state.appVersion)
 
         updateChecker.onChange = { [weak self] update in self?.updateDidChange(update) }
-        // A bare executable is not a bundle Homebrew can upgrade, so it is never offered one
+        // A bare executable is not a bundle the updater can replace, so it is never offered one
         if AppBundle.bundleURL != nil { updateChecker.start() }
         loadConfig()
         applyAppSettings()
@@ -471,27 +485,51 @@ public final class AppController: NSObject, NSApplicationDelegate {
     private func offerUpdate() {
         guard let update = state.availableUpdate, !state.isUpdating else { return }
         guard let bundle = AppBundle.bundleURL else { return }
-        guard UpdatePrompt.ask(about: update, currentVersion: AppBundle.shortVersion) == .update else { return }
-
-        if let message = UpdateInstaller.start(appBundle: bundle) {
-            log.error("cannot start the update: \(message, privacy: .public)")
-            UpdatePrompt.reportFailure(message)
+        if AppMover.needsMove(bundle: bundle) {
+            offerMove(bundle: bundle, onDecline: {})
             return
         }
+        guard UpdatePrompt.ask(about: update, currentVersion: AppBundle.shortVersion) == .update else { return }
 
         state.isUpdating = true
         render()
-        // Homebrew waits for this to finish before it touches the bundle, and opens the new one after
-        terminateApp()
+        Task {
+            do {
+                let staged = try await UpdateInstaller.prepare(update, appBundle: bundle)
+                try UpdateInstaller.start(staged: staged, appBundle: bundle)
+                // The shell waits for this to finish before it swaps the bundle, and opens the new one after
+                terminateApp()
+            } catch {
+                log.error("the update failed: \(error.localizedDescription, privacy: .public)")
+                state.isUpdating = false
+                render()
+                UpdatePrompt.reportFailure(error.localizedDescription)
+            }
+        }
     }
 
-    /// Homebrew ran while the app was gone, so its exit code is read back on the next launch
+    /// The swap ran while the app was gone, so its exit code is read back on the next launch
     private func reportLastUpdate() {
-        guard let code = UpdateInstaller.takeResult(), code != 0 else { return }
+        guard let code = lastUpdateResult, code != 0 else { return }
         log.error("the last update exited with \(code)")
         UpdatePrompt.reportFailure(
-            "Homebrew exited with code \(code). The output is in \(UpdateInstaller.logURL.abbreviatedPath)."
+            "Replacing Barnata failed with code \(code). The output is in \(UpdateInstaller.logURL.abbreviatedPath)."
         )
+    }
+
+    /// Asks to move the app into /Applications, then quits for the swap or calls `onDecline`
+    private func offerMove(bundle: URL, onDecline: @escaping @MainActor () -> Void) {
+        guard AppMover.ask() == .move else { return onDecline() }
+        Task {
+            do {
+                try await AppMover.move(bundle: bundle)
+                terminateApp()
+            } catch {
+                log.error("cannot move to Applications: \(error.localizedDescription, privacy: .public)")
+                AppMover.reportFailure()
+                onDecline()
+            }
+        }
     }
 
     // MARK: - Settings window

@@ -30,7 +30,7 @@ public enum UpdatePrompt {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "The update did not finish"
-        alert.informativeText = "\(message)\n\nYou can also run this in Terminal:\nbrew upgrade --cask \(UpdateInstaller.caskToken)"
+        alert.informativeText = "\(message)\n\nYou can also download the latest version from github.com/jacksluong/barnata/releases."
         alert.addButton(withTitle: "OK")
         alert.addButton(withTitle: "Show Log")
 

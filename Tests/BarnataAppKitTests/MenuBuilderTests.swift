@@ -196,7 +196,7 @@ final class MenuBuilderTests: XCTestCase {
         XCTAssertEqual(entries.item(titled: "Update available")?.action, .showUpdate)
     }
 
-    func testTheUpdateItemSaysSoAndGoesDeadWhileHomebrewRuns() {
+    func testTheUpdateItemSaysSoAndGoesDeadWhileUpdating() {
         var state = runningState()
         state.availableUpdate = AvailableUpdate(version: "9.9.9")
         state.isUpdating = true
