@@ -8,7 +8,8 @@ final class UpdateCheckerTests: XCTestCase {
         tag: String,
         body: String? = "Fixed the thing",
         draft: Bool = false,
-        prerelease: Bool = false
+        prerelease: Bool = false,
+        assets: [String]? = nil
     ) -> Data {
         var fields: [String] = [
             "\"tag_name\": \"\(tag)\"",
@@ -17,6 +18,7 @@ final class UpdateCheckerTests: XCTestCase {
             "\"prerelease\": \(prerelease)",
         ]
         if let body { fields.append("\"body\": \"\(body)\"") }
+        if let assets { fields.append("\"assets\": [\(assets.joined(separator: ","))]") }
         return Data("{\(fields.joined(separator: ","))}".utf8)
     }
 
@@ -46,5 +48,49 @@ final class UpdateCheckerTests: XCTestCase {
     func testAnythingThatIsNotAReleaseIsIgnored() {
         XCTAssertNil(UpdateChecker.update(in: Data("{\"message\":\"Not Found\"}".utf8), above: "0.2.1"))
         XCTAssertNil(UpdateChecker.update(in: Data("not json".utf8), above: "0.2.1"))
+    }
+
+    private let digestHex = String(repeating: "ab", count: 32)
+
+    private func asset(_ name: String, digest: String? = nil) -> String {
+        var fields = [
+            "\"name\": \"\(name)\"",
+            "\"browser_download_url\": \"https://github.com/jacksluong/barnata/releases/download/v1.0.0/\(name)\"",
+        ]
+        if let digest { fields.append("\"digest\": \"\(digest)\"") }
+        return "{\(fields.joined(separator: ","))}"
+    }
+
+    func testTheDMGAssetIsPickedByExactName() {
+        let data = release(tag: "v1.0.0", assets: [
+            asset("Barnata-1.0.0.dmg.sig", digest: "sha256:\(String(repeating: "00", count: 32))"),
+            asset("Barnata-1.0.0.dmg", digest: "sha256:\(digestHex)"),
+            asset("Barnata-0.9.0.dmg", digest: "sha256:\(String(repeating: "11", count: 32))"),
+        ])
+        let update = UpdateChecker.update(in: data, above: "0.2.1")
+        XCTAssertEqual(update?.downloadURL?.lastPathComponent, "Barnata-1.0.0.dmg")
+        XCTAssertEqual(update?.sha256, digestHex)
+    }
+
+    func testTheDigestPrefixIsStrippedAndTheHexLowercased() {
+        let data = release(tag: "v1.0.0", assets: [asset("Barnata-1.0.0.dmg", digest: "sha256:\(digestHex.uppercased())")])
+        XCTAssertEqual(UpdateChecker.update(in: data, above: "0.2.1")?.sha256, digestHex)
+        XCTAssertNil(UpdateChecker.sha256Hex(fromDigest: "sha512:\(digestHex)"))
+        XCTAssertNil(UpdateChecker.sha256Hex(fromDigest: "sha256:abc"))
+    }
+
+    func testAReleaseWithoutAssetsIsStillOfferedWithoutADownload() {
+        let update = UpdateChecker.update(in: release(tag: "v1.0.0"), above: "0.2.1")
+        XCTAssertEqual(update?.version, "1.0.0")
+        XCTAssertNil(update?.downloadURL)
+        XCTAssertNil(update?.sha256)
+    }
+
+    func testAZipOnlyReleaseHasNoDownload() {
+        let data = release(tag: "v1.0.0", assets: [asset("Barnata-1.0.0.zip", digest: "sha256:\(digestHex)")])
+        let update = UpdateChecker.update(in: data, above: "0.2.1")
+        XCTAssertEqual(update?.version, "1.0.0")
+        XCTAssertNil(update?.downloadURL)
+        XCTAssertNil(update?.sha256)
     }
 }

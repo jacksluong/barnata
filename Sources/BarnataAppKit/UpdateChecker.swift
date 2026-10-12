@@ -5,11 +5,23 @@ public struct AvailableUpdate: Sendable, Equatable {
     public var version: String
     public var notes: String?
     public var pageURL: URL?
+    /// The release's `Barnata-<version>.dmg`, nil when the release has none
+    public var downloadURL: URL?
+    /// Lowercase hex sha256 of the DMG, from the asset's `digest`
+    public var sha256: String?
 
-    public init(version: String, notes: String? = nil, pageURL: URL? = nil) {
+    public init(
+        version: String,
+        notes: String? = nil,
+        pageURL: URL? = nil,
+        downloadURL: URL? = nil,
+        sha256: String? = nil
+    ) {
         self.version = version
         self.notes = notes
         self.pageURL = pageURL
+        self.downloadURL = downloadURL
+        self.sha256 = sha256
     }
 }
 
@@ -20,6 +32,17 @@ public final class UpdateChecker {
     public static let timeout: TimeInterval = 15
     public static let latestReleaseURL = URL(
         string: "https://api.github.com/repos/jacksluong/barnata/releases/latest")!
+
+    /// Debug builds read a local feed from the `updateFeedURL` default when it is set
+    public static var feedURL: URL {
+        #if DEBUG
+        if let override = UserDefaults.standard.string(forKey: "updateFeedURL"),
+           let url = URL(string: override) {
+            return url
+        }
+        #endif
+        return latestReleaseURL
+    }
 
     /// Called when the answer changes, including back to nil
     public var onChange: ((AvailableUpdate?) -> Void)?
@@ -51,7 +74,7 @@ public final class UpdateChecker {
         guard !isChecking else { return }
         isChecking = true
 
-        var request = URLRequest(url: UpdateChecker.latestReleaseURL)
+        var request = URLRequest(url: UpdateChecker.feedURL)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.timeoutInterval = UpdateChecker.timeout
 
@@ -96,11 +119,23 @@ public final class UpdateChecker {
         guard !tag.isEmpty, compareVersions(tag, version) == .orderedDescending else { return nil }
 
         let notes = release.body?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let asset = release.assets?.first { $0.name == "Barnata-\(tag).dmg" }
         return AvailableUpdate(
             version: tag,
             notes: (notes?.isEmpty ?? true) ? nil : notes,
-            pageURL: release.htmlUrl.flatMap { URL(string: $0) }
+            pageURL: release.htmlUrl.flatMap { URL(string: $0) },
+            downloadURL: asset?.browserDownloadUrl.flatMap { URL(string: $0) },
+            sha256: asset?.digest.flatMap(sha256Hex(fromDigest:))
         )
+    }
+
+    /// `sha256:<hex>` to lowercase hex, nil for any other algorithm or a malformed value
+    nonisolated static func sha256Hex(fromDigest digest: String) -> String? {
+        let prefix = "sha256:"
+        guard digest.lowercased().hasPrefix(prefix) else { return nil }
+        let hex = digest.dropFirst(prefix.count).lowercased()
+        guard hex.count == 64, hex.allSatisfy(\.isHexDigit) else { return nil }
+        return hex
     }
 
     private struct Release: Decodable {
@@ -109,5 +144,12 @@ public final class UpdateChecker {
         var htmlUrl: String?
         var draft: Bool?
         var prerelease: Bool?
+        var assets: [Asset]?
+    }
+
+    private struct Asset: Decodable {
+        var name: String
+        var browserDownloadUrl: String?
+        var digest: String?
     }
 }
