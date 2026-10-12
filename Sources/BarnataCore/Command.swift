@@ -1,13 +1,18 @@
 import Foundation
 
 /// Runs a fixed system tool and collects its output. Never a shell, never a path from a request.
-enum Command {
-    struct Result {
-        var exitCode: Int32
-        var combinedOutput: String
+public enum Command {
+    public struct Result: Sendable {
+        public var exitCode: Int32
+        public var combinedOutput: String
+
+        public init(exitCode: Int32, combinedOutput: String) {
+            self.exitCode = exitCode
+            self.combinedOutput = combinedOutput
+        }
     }
 
-    static func run(_ executablePath: String, _ arguments: [String]) -> Result {
+    public static func run(_ executablePath: String, _ arguments: [String]) -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executablePath)
         process.arguments = arguments
