@@ -1,5 +1,5 @@
 #!/bin/bash
-# Notarizes build/Barnata.app, staples the ticket, and writes the release zip.
+# Notarizes build/Barnata.app and staples the ticket. make-dmg.sh packs the result.
 # Requires the `barnata` notarytool keychain profile from Scripts/vars.sh.
 set -euo pipefail
 
@@ -10,7 +10,6 @@ APP="${BUILD_DIR}/${APP_NAME}.app"
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${APP}/Contents/Info.plist")"
 SUBMISSION_ZIP="${BUILD_DIR}/${APP_NAME}-submission.zip"
-RELEASE_ZIP="${BUILD_DIR}/${APP_NAME}-${VERSION}.zip"
 
 if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
   echo "no notarytool keychain profile named ${NOTARY_PROFILE}" >&2
@@ -32,15 +31,10 @@ fi
 echo "==> Stapling"
 xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
-
-echo "==> Zipping ${RELEASE_ZIP#"$BUILD_DIR"/}"
-rm -f "$SUBMISSION_ZIP" "$RELEASE_ZIP"
-ditto -c -k --keepParent "$APP" "$RELEASE_ZIP"
+rm -f "$SUBMISSION_ZIP"
 
 echo "==> Verifying Gatekeeper"
 spctl --assess --type execute --verbose "$APP"
 
 echo
-echo "==> ${RELEASE_ZIP}"
-echo "    version ${VERSION}"
-echo "    sha256  $(shasum -a 256 "$RELEASE_ZIP" | awk '{ print $1 }')"
+echo "==> Notarized ${APP} version ${VERSION}"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Cuts a release: tag, build, sign, notarize, publish, bump the cask.
+# Cuts a release: tag, build, sign, notarize the app and the DMG, publish.
 #
 # Usage: Scripts/release.sh <version> [--dry-run] [note...]
 #   <version>   semver without the leading v, e.g. 0.1.0
@@ -34,7 +34,7 @@ read -r -p "Continue? [y/N] " REPLY
 [[ "$REPLY" =~ ^[Yy]$ ]] || { echo "cancelled"; exit 1; }
 
 TAG="v${VERSION}"
-RELEASE_ZIP="${BUILD_DIR}/${APP_NAME}-${VERSION}.zip"
+RELEASE_DMG="${BUILD_DIR}/${APP_NAME}-${VERSION}.dmg"
 
 cd "$REPO_ROOT"
 
@@ -57,17 +57,18 @@ trap 'git tag -d "$TAG" >/dev/null 2>&1 || true' ERR
 
 "${REPO_ROOT}/Scripts/build-app.sh"
 "${REPO_ROOT}/Scripts/notarize.sh"
+"${REPO_ROOT}/Scripts/make-dmg.sh"
 
 BUILT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${BUILD_DIR}/${APP_NAME}.app/Contents/Info.plist")"
 [[ "$BUILT_VERSION" == "$VERSION" ]] || { echo "bundle says ${BUILT_VERSION}, expected ${VERSION}" >&2; exit 1; }
 
-SHA256="$(shasum -a 256 "$RELEASE_ZIP" | awk '{ print $1 }')"
+SHA256="$(shasum -a 256 "$RELEASE_DMG" | awk '{ print $1 }')"
 trap - ERR
 
 if [[ $DRY_RUN -eq 1 ]]; then
   git tag -d "$TAG"
   echo
-  echo "==> Dry run finished. ${RELEASE_ZIP##*/}, sha256 ${SHA256}"
+  echo "==> Dry run finished. ${RELEASE_DMG##*/}, sha256 ${SHA256}"
   exit 0
 fi
 
@@ -75,21 +76,13 @@ echo "==> Pushing ${TAG}"
 git push origin "$TAG"
 
 echo "==> Creating the GitHub release"
-gh release create "$TAG" "$RELEASE_ZIP" \
+gh release create "$TAG" "$RELEASE_DMG" \
   --repo "$GITHUB_REPO" \
   --title "$TAG" \
   --notes "$NOTES"
 
-CASK="${TAP_DIR}/Casks/${CASK_NAME}.rb"
-if [[ -f "$CASK" ]]; then
-  echo "==> Bumping ${CASK}"
-  sed -i '' -e "s/^  version \".*\"$/  version \"${VERSION}\"/" -e "s/^  sha256 \".*\"$/  sha256 \"${SHA256}\"/" "$CASK"
-  echo "    commit and push ${TAP_DIR} to publish it"
-else
-  echo "==> No cask at ${CASK}; set these by hand in ${TAP_REPO}"
-fi
-
 echo
 echo "==> Released ${TAG}"
+echo "    ${RELEASE_DMG##*/}"
 echo "    version ${VERSION}"
 echo "    sha256  ${SHA256}"
