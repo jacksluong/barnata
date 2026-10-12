@@ -82,12 +82,21 @@ public enum AppMover {
             guard copy.exitCode == 0 else {
                 throw UpdateError("Cannot copy Barnata: \(copy.combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
             }
-            try UpdateInstaller.verify(staged: staged, expectedVersion: nil)
+            try UpdateInstaller.verify(staged: staged, expectedVersion: nil, assessGatekeeper: !isDebugBuild)
             return staged
         } catch {
             try? FileManager.default.removeItem(at: staging)
             throw error
         }
+    }
+
+    /// A debug build is signed but never notarized, so Gatekeeper would reject every move of it
+    private nonisolated static var isDebugBuild: Bool {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
     }
 
     /// The original's path when it can go to the Trash, nil when it is a translocated copy whose

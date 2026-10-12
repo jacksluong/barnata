@@ -73,7 +73,7 @@ public enum UpdateInstaller {
 
     /// The signature, Gatekeeper, bundle id, and version checks every staged app goes through,
     /// followed by clearing any quarantine flag
-    public static func verify(staged: URL, expectedVersion: String?) throws {
+    public static func verify(staged: URL, expectedVersion: String?, assessGatekeeper: Bool = true) throws {
         guard let teamID = CodeSignature.selfTeamIdentifier() else {
             throw UpdateError("Barnata is not signed, so it cannot check the new version.")
         }
@@ -87,9 +87,11 @@ public enum UpdateInstaller {
             throw UpdateError("The new version is not signed by the Barnata developer (\(error)).")
         }
 
-        let assessment = Command.run("/usr/sbin/spctl", ["--assess", "--type", "execute", staged.path])
-        guard assessment.exitCode == 0 else {
-            throw UpdateError("Gatekeeper rejected the new version: \(assessment.combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
+        if assessGatekeeper {
+            let assessment = Command.run("/usr/sbin/spctl", ["--assess", "--type", "execute", staged.path])
+            guard assessment.exitCode == 0 else {
+                throw UpdateError("Gatekeeper rejected the new version: \(assessment.combinedOutput.trimmingCharacters(in: .whitespacesAndNewlines))")
+            }
         }
 
         let info = NSDictionary(contentsOf: staged.appending(path: "Contents/Info.plist")) as? [String: Any] ?? [:]
