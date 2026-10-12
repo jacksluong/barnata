@@ -6,6 +6,12 @@ import Foundation
 /// folder, and the app bundle. Referenced kanata files are never touched.
 @MainActor
 public struct Uninstaller {
+    /// Homebrew's whole record of a cask install, owned by the user who installed it
+    nonisolated static let caskroomFolders = [
+        URL(fileURLWithPath: "/opt/homebrew/Caskroom/barnata"),
+        URL(fileURLWithPath: "/usr/local/Caskroom/barnata"),
+    ]
+
     public let setup: SetupActions
     public let configURL: URL
 
@@ -29,6 +35,8 @@ public struct Uninstaller {
             return
         }
 
+        Uninstaller.removeCaskroomRecords()
+
         guard let bundle = AppBundle.bundleURL else {
             log.notice("running outside an app bundle, nothing to move to the Trash")
             terminateApp()
@@ -42,6 +50,22 @@ public struct Uninstaller {
                 } else {
                     terminateApp()
                 }
+            }
+        }
+    }
+
+    /// Deletes a Homebrew install's Caskroom folder so `brew` stops listing Barnata. A failure is
+    /// only logged, since the app itself still uninstalls. Returns the folders that could not be deleted.
+    @discardableResult
+    nonisolated static func removeCaskroomRecords(_ folders: [URL] = caskroomFolders) -> [URL] {
+        folders.filter { folder in
+            guard FileManager.default.fileExists(atPath: folder.path) else { return false }
+            do {
+                try FileManager.default.removeItem(at: folder)
+                return false
+            } catch {
+                log.error("cannot delete \(folder.path, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                return true
             }
         }
     }
