@@ -21,11 +21,7 @@ Inspired by [kanata-tray](https://github.com/rszyma/kanata-tray). Barnata simpli
 
 ## Install
 
-```sh
-brew install --cask jacksluong/tap/barnata
-```
-
-The app automatically checks for updates.
+Download `Barnata-<version>.dmg` from the [latest release](https://github.com/jacksluong/barnata/releases/latest), open it, and drag Barnata into Applications. The app automatically checks for updates.
 
 ## Usage
 
@@ -93,7 +89,11 @@ If provided, status icons replace the default menu bar image for each state. Nam
 
 ## Uninstall
 
-The best way to uninstall is through the Uninstall button in the Preferences window. Uninstalling through Homebrew will result in an orphaned entry in Login Items.
+Use the Uninstall button in the Preferences window.
+
+## Troubleshooting
+
+If macOS shows “Barnata” Not Opened, open System Settings > Privacy & Security, scroll to Security, and click Open Anyway next to the Barnata message.
 
 ## License
 
