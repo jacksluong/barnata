@@ -89,6 +89,7 @@ private struct GeneralTab: View {
                 }
                 Button(model.updateButtonTitle) { model.updateButtonTapped() }
                     .disabled(!model.isUpdateButtonEnabled)
+                Button("About") { NSApp.orderFrontStandardAboutPanel(nil) }
             }
             .padding(.horizontal, 20)
             .padding(.top, 12)
